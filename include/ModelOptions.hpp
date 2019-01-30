@@ -287,12 +287,19 @@ class EffXtrapScenarios{
         /** harvest control rule to use */
         int HCR; 
         /** min year for averaging in HCR 1*/
-        int HCR1_avgMinYr;
+        int HCR_avgMinYr;
         /** max year for averaging in HCR 1*/
-        int HCR1_avgMaxYr;
+        int HCR_avgMaxYr;
          /** id of ramp to use in HCR 2 */
         int HCR2_rampID;
- 
+        /** buffer for use in HCR 3 */
+        int HCR3_buffer;
+        /** Exploitation rate of exploitable legal males */
+        double HCR6_xpRate;
+        /** Selectivity of old shell crab, assumed to be 50%*/
+        double HCR6_sOS; 
+        
+        
     public:
         /**
          * Class constructor

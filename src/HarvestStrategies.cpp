@@ -207,7 +207,7 @@ double HarvestStrategies::HCR5_FemaleBlocks(double MFB, double aveMFB, double MM
  * 
  * @return 
  */
-double HarvestStrategies::HCR6_ELM(double propNS, dvector abunELM, dvector weights, double sOS, int xpRate){
+double HarvestStrategies::HCR6_ELM(double propNS, dvector abunELM, dvector weights, double sOS, double xpRate){
     double xpLM = 0; // exploitable legal males 
     double TAC;
     
@@ -217,3 +217,27 @@ double HarvestStrategies::HCR6_ELM(double propNS, dvector abunELM, dvector weigh
     TAC=xpLM*xpRate;
     return TAC;
 }
+
+
+
+double HarvestStrategies::HCR7_StatusQuo(double MFB, double aveMFB, double MMB, double aveMMB,dvector abunELM, dvector weights, dvector FISHERY_SELECTIVITY ){
+    double xpLM = 0; // exploitable legal males 
+    double Cmsy = 0;
+    double Fmsy = 0.74;
+    double TAC;
+    
+    if(MFB>= 0.4*aveMFB && MMB>= 0.25*aveMMB){
+    
+      for(int i = abunELM.indexmin(); i<=abunELM.indexmax(); ++i){ // check this indexing format    
+        Cmsy += (abunELM[i]*exp(-0.625*0.23))*FISHERY_SELECTIVITY[i]*(1-exp(-Fmsy));         
+      }
+      
+    }else{
+        Cmsy = 0;
+    }
+   
+    TAC= Cmsy * (MMB/aveMMB*0.9); 
+    return TAC;
+    
+}
+

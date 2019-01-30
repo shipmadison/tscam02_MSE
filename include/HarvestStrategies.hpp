@@ -93,7 +93,22 @@ class HarvestStrategies {
          * 
          * @return 
          */
-        double static HCR6_ELM(double propNS, dvector abunELM, dvector weights, double sOS, int xpRate );
+        double static HCR6_ELM(double propNS, dvector abunELM, dvector weights, double sOS, double xpRate );
+        
+        /**
+         * 
+         * @param MFB
+         * @param aveMFB
+         * @param MMB
+         * @param aveMMB
+         * @param abunELM
+         * @param weights
+         * @param FISHERY_SELECTIVITY Fix this, find the selectivity(sex,size) in tpl
+         * @return 
+         */
+        
+        double static HCR7_StatusQuo(double MFB, double aveMFB, double MMB, double aveMMB,dvector abunELM, dvector weights, dvector FISHERY_SELECTIVITY);
+
 
 private:
         //class constructor

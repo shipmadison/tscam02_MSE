@@ -45,8 +45,8 @@
 
 
 # Environment 
-PLATFORM=MAC
-ADMB_HOME_WIN=C:/Programs/ADMB64
+PLATFORM=WIN
+ADMB_HOME_WIN=C:/ADMB
 ADMB_HOME_MAC=/Users/WilliamStockhausen/Programs/admb_v12/build/dist
 ADMB_HOME=${ADMB_HOME_${PLATFORM}}
 TPL=tcsam02

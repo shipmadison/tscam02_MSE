@@ -246,7 +246,7 @@ void EffXtrapScenarios::writeToR(std::ostream& os){
 //          ModelOptions
 //--------------------------------------------------------------------------------
 int ModelOptions::debug = 0;
-const adstring ModelOptions::VERSION = "2018.11.07";
+const adstring ModelOptions::VERSION = "2019.01.30"; // change this to make sure correct model options file version being used
 
 ModelOptions::ModelOptions(ModelConfiguration& mc){
     ptrMC=&mc;
@@ -457,15 +457,26 @@ void ModelOptions::read(cifstream & is) {
         is>>str;
         if (str=="HCR1"){
             cout<<"#--options for "<<str<<endl;
-            is>>HCR1_avgMinYr;
-            is>>HCR1_avgMaxYr;
-            cout<<HCR1_avgMinYr<<tb<<HCR1_avgMaxYr<<tb<<"#min, max years for averaging"<<endl;
-            if (HCR1_avgMaxYr==-1) HCR1_avgMaxYr = ptrMC->mxYr;
+            is>>HCR_avgMinYr;
+            is>>HCR_avgMaxYr;
+            cout<<HCR_avgMinYr<<tb<<HCR_avgMaxYr<<tb<<"#min, max years for averaging"<<endl;
+            if (HCR_avgMaxYr==-1) HCR_avgMaxYr = ptrMC->mxYr;
         } else if (str=="HCR2"){
+            //should code be added here, same as above?
             cout<<"#--options for "<<str<<endl;
             is>>HCR2_rampID;
             cout<<HCR2_rampID<<tb<<tb<<"#ramp id"<<endl;
-        } else {tst=0;}
+        } else if (str=="HRC3"){
+            cout<<"#--options for "<<str<<endl;
+            is>>HCR3_buffer;
+            cout<<HCR3_buffer<<tb<<tb<<"#buffer"<<endl;
+        } else if (str=="HCR6"){
+            //should code be added here, same as above?
+            cout<<"#--options for "<<str<<endl;
+            is>>HCR6_xpRate;
+            cout<<HCR6_xpRate<<tb<<tb<<"#ramp id"<<endl;
+            
+        }else {tst=0;}
     }
     
     if (debug) cout<<"end ModelOptions::read(cifstream & is)"<<endl;
