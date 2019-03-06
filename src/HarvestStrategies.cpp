@@ -220,23 +220,20 @@ double HarvestStrategies::HCR6_ELM(double propNS, dvector abunELM, dvector weigh
 
 
 
-double HarvestStrategies::HCR7_StatusQuo(double MFB, double aveMFB, double MMB, double aveMMB,dvector abunELM, dvector weights, dvector FISHERY_SELECTIVITY ){
+double HarvestStrategies::HCR7_StatusQuo(double MFB, double aveMFB, double MMB, double aveMMB,double CWmsy ){
     double xpLM = 0; // exploitable legal males 
-    double Cmsy = 0;
-    double Fmsy = 0.74;
+
     double TAC;
     
     if(MFB>= 0.4*aveMFB && MMB>= 0.25*aveMMB){
     
-      for(int i = abunELM.indexmin(); i<=abunELM.indexmax(); ++i){ // check this indexing format    
-        Cmsy += (abunELM[i]*exp(-0.625*0.23))*FISHERY_SELECTIVITY[i]*(1-exp(-Fmsy));         
-      }
+      TAC= CWmsy * (MMB/aveMMB*0.9);
       
     }else{
-        Cmsy = 0;
+        TAC = 0;
     }
    
-    TAC= Cmsy * (MMB/aveMMB*0.9); 
+    
     return TAC;
     
 }

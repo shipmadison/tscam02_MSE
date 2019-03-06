@@ -8098,7 +8098,7 @@ FUNCTION int calcTAC(int hcr, double OFL)
         ivector perm(1,2); perm[1]=2;perm[2]=1; //transposing to move from sex and year to yr and sex 
         dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
         double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
-        TAC = HarvestStrategies::HCR_FemaleRamp(MFB, aveMFB, MMB);
+        TAC = HarvestStrategies::HCR1_FemaleRamp(MFB, aveMFB, MMB);
         info = "#--HCR1: MFB = "+str(MFB)+cc+"aveMFB = "+str(aveMFB)+cc+"ratio = "+str(MFB/aveMFB)+cc+"TAC = "+str(TAC);
     }
 
@@ -8154,15 +8154,18 @@ FUNCTION int calcTAC(int hcr, double OFL)
 // Harvest Control Rule 6--Exploitable Legal Males 
     if (hcr==6){                             
        
+        dmatrix vspB_yx = value(spB_yx); 
         ivector perm(1,2); perm[1]=2;perm[2]=1; // creating a 2d vector perm <- 2,1 
         dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx); 
 
-        d3_array weights = ptrMDS->ptrBio->wAtZ_xmz; // array from pointer to a pointer with weights by sex, maturity, size   
-        double newshell = value(sum(n_yxmsz(mxYr,MALES,MATURE, NEW_SHELL)(20,32))); //n_yxmsz is 5d array by year, sex, maturity, stage, size
+        //d3_array weights = ptrMDS->ptrBio->wAtZ_xmz; // array from pointer to a pointer with weights by sex, maturity, size   
+        dvector weights = ptrMDS->ptrBio->wAtZ_xmz(MALE, MATURE);
+        
+        double newshell = value(sum(n_yxmsz(mxYr,MALE,MATURE, NEW_SHELL)(20,32))); //n_yxmsz is 5d array by year, sex, maturity, stage, size
         
         double total = 0.0;
         for (int s = 1; s<=nSCs; s++){
-             total += value(sum(n_yxmsz(mxYr, MALES, MATURE, s)(20,32))); 
+             total += value(sum(n_yxmsz(mxYr, MALE, MATURE, s)(20,32))); 
             }
 
         double propNS = newshell/total;
@@ -8171,7 +8174,7 @@ FUNCTION int calcTAC(int hcr, double OFL)
         abundELM.initialize();
 
         for (int s = 1; s<=nSCs; s++){
-            abundELM += value(n_yxmsz(mxYr, MALES, MATURE, s)(20,32)); 
+            abundELM += value(n_yxmsz(mxYr, MALE, MATURE, s)(20,32)); 
             }
         
 
@@ -8185,31 +8188,43 @@ FUNCTION int calcTAC(int hcr, double OFL)
 // Harvest Control Rule 7--"Status Quo" 
     if (hcr==7){  
         
+        double Fmsy        = value(ptrOFLResults->Fmsy);
+        d3_array selF_msz  = value(ptrOFLResults->pCIM->selF_fmsz(1));//pull out selectivity for directed fishery
+        d3_array M_msz     = value(ptrOFLResults->pPDIM->M_msz);      //natural mortality
+        d3_array n_msz     = value(this->n_vyxmsz(1,mxYr,MALE));      //ESTIMATED male survey abundance in final year
+        dmatrix w_mz       = value(ptrMDS->ptrBio->wAtZ_xmz(MALE));   //weight at size
+        dvector cpB_z(20,32); cpB_z.initialize();
+        for (int m=1;m<=nMSs;m++){                       //loops over maturity state
+            for (int s=1;s<=nMSs;s++){                   //loops over shell condition
+                cpB_z += elem_prod(selF_msz(m,s)(20,32),
+                                   elem_prod(exp(-M_msz(m,s)(20,32)),
+                                             elem_prod(n_msz(m,s)(20,32),w_mz(m)(20,32))
+                                            )
+                                                )*(1-exp(-Fmsy));       
+            }
+        }
+        double CWmsy = sum(cpB_z);
+        //now calculate TAC using the HCR
+            
+        dmatrix vspB_yx = value(spB_yx);
         double MMB = vspB_yx(mxYr,  MALE);
         double MFB = vspB_yx(mxYr,FEMALE);
-        ivector perm(1,2); perm[1]=2;perm[2]=1;// once again, check what this line does 
+        ivector perm(1,2); perm[1]=2;perm[2]=1;
         dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
         double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
         double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+             
 
-        dvector abundELM(20,32);
-        abundELM.initialize();
 
-        for (int s = 1; s<=nSCs; s++){
-            abundELM += value(n_yxmsz(mxYr, MALES, MATURE, s)(20,32)); //THIS Needs to change to be based on survey biomass, not estimated biomass (abund*weght)
-            }
-       
-                       
-        TAC = HarvestStrategies::HCR7_StatusQuo(MFB,aveMFB, MMB, aveMMB, abunELM, weights, FISHERY_SELECTIVITY); // FIX END
+        TAC = HarvestStrategies::HCR7_StatusQuo(MFB,aveMFB, MMB, aveMMB, CWmsy); // FIX END
         
-    // need to add a half TAC rule --> look at retained catch in mcYr-1 in directed fishery 
-            if( retained catch (yr-1) == 0) TAC = 0.5*TAC;
-          
-            //info(
-}
+            // need to add a half TAC rule --> look at retained catch in mcYr-1 in directed fishery 
+                
+    }
 
-
-    if (TAC>0.0) closed=0;
+    //if(rmN_fyxmsz(1, mxYr-1, MALE, MATURE, 1, (20,32)) == 0) //put a counter here at some point
+    if(rmN_fyxmsz(1, mxYr-1, MALE, MATURE, 1, (20,32)) == 0) TAC = 0.5*TAC; // Half TAC rule VERIFY THIS DOES WHAT IT'S SUPPOSED TO
+    if (TAC>0.0) closed=0;  // If there is a TAC the fishery is not closed 
 
     //--save TAC and OFL to file for OpMod to read
     adstring fn = "TAC_"+str(mxYr+1)+".txt";
@@ -8227,12 +8242,12 @@ FUNCTION int calcTAC(int hcr, double OFL)
 FUNCTION finishOpModMode
     PRINT2B1("#----MSE OpModMode: Recalculating population dynamics")
     if (inpTAC>0.0){
-        dvariable mseCapF = mfexp(pMSE_LnC[1]);
+        dvariable mseCapF = mfexp(pMSE_LnC[1]);//exponentiated version of estimated param (by opmod)
         projectPopForTAC(mseCapF,0,cout);
-        calcObjFunForTAC(dbgObjFun,cout);
+        calcObjFunForTAC(dbgObjFun,cout); //recalc
         PRINT2B2("#--Final obj fun = ",objFun)
     } else {
-        projectPopForZeroTAC(0,cout);
+        projectPopForZeroTAC(0,cout); //if TAC 0 project w/o dir fishery
     }
 
     //--define parent folder for subsequent files
@@ -8281,8 +8296,8 @@ FUNCTION finishOpModMode
     //----calculate survey data for year mxYr+1
     cout<<"Calculating survey data for for year "<<ptrMC->mxYr+1<<endl;
     prj_n_vxmsz.initialize();
-    for (int v=1;v<=nSrv;v++){
-        for (int x=1;x<=nSXs;x++){
+    for (int v=1;v<=nSrv;v++){ //survey # (only one in this case) 
+        for (int x=1;x<=nSXs;x++){ 
             for (int m=1;m<=nMSs;m++){
                 for (int s=1;s<=nSCs;s++){
                     //NOTE: using survey characteristics from final year of "real" data
@@ -8347,6 +8362,51 @@ FUNCTION finishOpModMode
     ofs.close();
     }
 
+    //--calculate OFL
+        {
+            cout<<"#----Starting OFL calculations"<<endl;
+            ofstream echoOFL_OpMod; echoOFL_OpMod.open("calcOFL_OpMod.final.txt", ios::trunc);//changed name?
+            echoOFL_OpMod.precision(12);
+            calcOFL(mxYr+1,1,echoOFL_OpMod);//updates ptrOFLResults
+            ptrOFLResults->writeCSVHeader(echoOFL_OpMod); echoOFL_OpMod<<endl;
+            ptrOFLResults->writeToCSV(echoOFL_OpMod);     echoOFL_OpMod<<endl;
+            echoOFL_OpMod.close();
+            cout<<"#----Finished OFL calculations"<<endl;
+        }
+        
+    //--calculate TAC for upcoming year using harvest control rule
+        { 
+            cout<<"#----Starting TAC calculations"<<endl;
+            int closed = calcTAC(doTAC, value(ptrOFLResults->OFL));
+        }
+
+    //-- performance metrics for Operating Model 
+        {
+            //PRINT2B1("writing performance metrics OP MODEL")
+
+            cout<<"#---writing performance metrics OP MODEL "<<ptrMC->mxYr+1<<endl;
+            adstring perfMetricsOPMod = "perfMetricsOPMod_"+str(mxYr+1)+".txt"; // Add perfMet somewhere earlier in function?
+
+            ofstream os; os.open("perfMetricsOPMod.txt", ios::trunc);       // ::trunc or app?
+            os.precision(6); //number of decimal places in file
+
+            os<<"#--Performance Metrics for Operating Model--"<<endl;
+            os<<"perfMetricsOPMod.final=list("<<endl;                  //Check line 
+            os<<"TAC="; calcTAC(doTAC, value(ptrOFLResults->OFL)); os<<cc<<endl;
+            os<<"OFL="; ptrOFLResults->OFL; os<<cc<<endl; // OFL
+            os<<"MMB="; prj_spB_x(MALE); os<<cc<<endl; //
+            os<<"MFB="; prj_spB_x(FEMALE); os<<cc<<endl; // 
+            os<<"DISCARDS="; wts::writeToR(os,wts::value(prj_dmN_fxmsz),fDms,xDms,mDms,sDms,zbDms); os<<cc<<endl;
+            os<<"CATCH="; wts::writeToR(os,wts::value(prj_rmN_fxmsz),fDms,xDms,mDms,sDms,zbDms); os<<endl;
+            os<<")"<<endl;
+            os<<"#--Finished performance metrics OP MODEL FINAL_PHASE--"<<endl;
+            os<<")"<<endl;
+            os.close();
+           
+
+            PRINT2B1("finished writing performance metrics OP MODEL")
+  
+        }
 // =============================================================================
 // =============================================================================
 FINAL_SECTION
@@ -8354,7 +8414,7 @@ FINAL_SECTION
     PRINT2B1("#--Starting FINAL_SECTION")
         
     if (!mseMode){
-        PRINT2B1("#--mseMode is OFF")
+        PRINT2B1("#--mseMode is OFF") //not running OP or EST model
         if (mcevalOn) {
             PRINT2B1("#--mceval is ON")
             PRINT2B1("#----Closing mcmc file")
@@ -8440,12 +8500,6 @@ FINAL_SECTION
                 PRINT2B1("#----Finished writing OpMod state file")
             }
 
-            // write a section for ofstreams for perfMetrics in OPERATING MODEL ONLY 
-
-
-
-
-            
             //write MPI for EstMod for upcoming year
             //----devs for upcoming year are zero
             {
@@ -8464,7 +8518,7 @@ FINAL_SECTION
                 ptrMPI->writePin(ofs);
                 ofs.close();
             }
-                
+               
         }
     } else if (mseEstModMode){
         //running in estModMode
@@ -8508,12 +8562,31 @@ FINAL_SECTION
         }
 
         // WRITE OFstream for performance metrics for ESTIMATION MODEL 
+            
+        {
+            PRINT2B1("writing performance metrics EST MODEL") //EDIT
+            
+            adstring perfMetricsEstMod = "perfMetricsEstMod_"+str(mxYr+1)+".txt"; // Add perfMet somewhere earlier in function?
 
+            ofstream os; os.open(perfMetricsEstMod, ios::app);       // ::trunc or app? Eventually appended but FIX IT FIRST
+            os<<"#--Performance Metrics for Estimation Model--"<<endl;
+            os<<"perfMetricsEstMod.final=list("<<endl;                  //Check line 
+            os<<"TAC="; os<<calcTAC(doTAC, value(ptrOFLResults->OFL)); os<<","<<endl;
 
+            //os<<"OFL="; calcOFL(mxYr+1,1,os); os<<cc<<endl; // OFL
+            os<<"OFL="; os<<value(ptrOFLResults->OFL); os<<cc<<endl; // OFL
 
-
-
-
+            os<<"MMB="; os<<spB_yx(mxYr, MALE); os<<cc<<endl; //
+            os<<"MFB="; os<<spB_yx(mxYr, FEMALE); os<<cc<<endl; // 
+            os<<"DISCARDS="; wts::writeToR(os,wts::value(dmN_fyxmsz),fDms,yDms,xDms,mDms,sDms,zbDms); os<<cc<<endl;
+            os<<"CATCH="; wts::writeToR(os,wts::value(rmN_fyxmsz),fDms,yDms,xDms,mDms,sDms,zbDms); os<<endl;
+            os<<")"<<endl;
+            os<<"#--Finished performance metrics EST MODEL FINAL_PHASE--"<<endl;
+            os<<")"<<endl;
+            os.close();
+           
+            PRINT2B1("finished writing performance metrics EST MODEL")
+        }
                 
     } else if (mseOpModMode){
         finishOpModMode();

@@ -107,7 +107,7 @@ class HarvestStrategies {
          * @return 
          */
         
-        double static HCR7_StatusQuo(double MFB, double aveMFB, double MMB, double aveMMB,dvector abunELM, dvector weights, dvector FISHERY_SELECTIVITY);
+        double static HCR7_StatusQuo(double MFB, double aveMFB, double MMB, double aveMMB, double CWmsy);
 
 
 private:
