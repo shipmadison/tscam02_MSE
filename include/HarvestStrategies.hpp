@@ -50,6 +50,30 @@ class HarvestStrategies {
         double static HCR2_MaleRamp(double MMB, double aveMMB, int rampID);
         
         /**
+         * HCR 22. Survey Estimates of MMB, Slope set to Middle Ramp (10/75)
+         * 
+         * @param MMB Mature Male Biomass in millions of lbs for the year 
+         * @param aveMMB constant, MMB average from 1982-2016
+         * @param rampID identifies the level of exploitation rate, low, moderate, or aggressive 
+         * 
+         * @return 
+         */
+        
+        double static HCR22_MaleRamp_SurvEst(double MMB, double aveMMB);
+        
+         /**
+         * HCR 23. Model Survey Estimates of MMB, Slope set to Middle Ramp (10/75)
+         * 
+         * @param MMB Mature Male Biomass in millions of lbs for the year 
+         * @param aveMMB constant, MMB average from 1982-2016
+         * @param rampID identifies the level of exploitation rate, low, moderate, or aggressive 
+         * 
+         * @return 
+         */
+        
+        double static HCR23_MaleRamp_ModSurvEst(double MMB, double aveMMB);
+        
+        /**
          * HCR 3. Takes OFL from operating model, uses pre-determined buffer.
          * 
          * @param OFL from the model
@@ -96,7 +120,7 @@ class HarvestStrategies {
         double static HCR6_ELM(double propNS, dvector abunELM, dvector weights, double sOS, double xpRate );
         
         /**
-         * 
+         * HCR 7. Status Quo
          * @param MFB
          * @param aveMFB
          * @param MMB

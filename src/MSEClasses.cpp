@@ -25,7 +25,7 @@ void MSE_OpModInfo::read(cifstream& is){
     is>>dtM;  //dtM
     allocate();
     is>>wAtZ_xmz; 
-    is>>R_y(mnYr,mxYr);
+    is>>R_y;
     is>>R_x;
     is>>R_z;
     is>>M_xmsz;
@@ -41,7 +41,7 @@ void MSE_OpModInfo::read(cifstream& is){
 
 void MSE_OpModInfo::allocate(){
     wAtZ_xmz.allocate(1,nSXs,1,nMSs,1,nZBs);
-    R_y.allocate(mnYr,mxYr);
+    R_y.allocate(mnYr,mxYr-1);
     R_x.allocate(1,nSXs);
     R_z.allocate(1,nZBs);
     M_xmsz.allocate(1,nSXs,1,nMSs,1,nSCs,1,nZBs);

@@ -29,9 +29,9 @@ public:
     double dtF;  //dtF
     double dtM;  //dtM
     d3_array wAtZ_xmz; 
-    dvector R_y;
-    dvector R_x;
-    dvector R_z;
+    dvector R_y; //recruitment by year from Model start to last year (recruitment from previous year contributing to current year)
+    dvector R_x;//fraction of recruitment (50/50)
+    dvector R_z; //relative recruitment by size (dist)
     d4_array M_xmsz;
     d4_array prGr_xszz;
     dmatrix prM2M_xz;

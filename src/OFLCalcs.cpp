@@ -669,7 +669,7 @@ dvariable OFL_Calculator::calcOFL(dvariable Fofl, dvar4_array& n_xmsz, ostream& 
     RETURN_ARRAYS_DECREMENT();
     return ofl;
 }
-/**
+/** 
  * Calculate the (projected) MMB when fished at Fofl.
  * 
  * @param Fofl - target fishery capture rate

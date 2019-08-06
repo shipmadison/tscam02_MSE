@@ -464,18 +464,44 @@ void ModelOptions::read(cifstream & is) {
         } else if (str=="HCR2"){
             //should code be added here, same as above?
             cout<<"#--options for "<<str<<endl;
+            is>>HCR_avgMinYr;
+            is>>HCR_avgMaxYr;
+            cout<<HCR_avgMinYr<<tb<<HCR_avgMaxYr<<tb<<"#min, max years for averaging"<<endl;
+            if (HCR_avgMaxYr==-1) HCR_avgMaxYr = ptrMC->mxYr;
             is>>HCR2_rampID;
-            cout<<HCR2_rampID<<tb<<tb<<"#ramp id"<<endl;
+            cout<<HCR2_rampID<<tb<<tb<<"#ramp id"<<endl;    
+            
+         // ADD OTHER HCRS 
+        } else if (str=="HCR22"){    
+           cout<<tb<<tb<<"#HCR22"<<endl; 
+        
+        } else if (str=="HCR23"){    
+           cout<<tb<<tb<<"#HCR23"<<endl; 
+            
         } else if (str=="HRC3"){
             cout<<"#--options for "<<str<<endl;
             is>>HCR3_buffer;
             cout<<HCR3_buffer<<tb<<tb<<"#buffer"<<endl;
+        
+        } else if (str=="HCR4"){ 
+           cout<<"#--options for "<<str<<endl;
+           //<<tb<<tb<<"#HCR4"<<endl; 
+           is>>HCR_avgMinYr;
+           is>>HCR_avgMaxYr;
+           cout<<HCR_avgMinYr<<tb<<HCR_avgMaxYr<<tb<<"#min, max years for averaging"<<endl;
+           if (HCR_avgMaxYr==-1) HCR_avgMaxYr = ptrMC->mxYr;
+        } else if (str=="HCR5"){    
+           cout<<tb<<tb<<"#HCR5"<<endl; 
+            
         } else if (str=="HCR6"){
             //should code be added here, same as above?
             cout<<"#--options for "<<str<<endl;
             is>>HCR6_xpRate;
             cout<<HCR6_xpRate<<tb<<tb<<"#ramp id"<<endl;
-            
+        
+        } else if (str=="HCR7"){    
+           cout<<tb<<tb<<"#HCR7"<<endl; 
+           
         }else {tst=0;}
     }
     

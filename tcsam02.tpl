@@ -730,6 +730,16 @@ DATA_SECTION
         rpt::echo<<"#OFL calculations turned ON"<<endl;
         rpt::echo<<"#-------------------------------------------"<<endl;
         flg = 1;
+
+
+    // Add a section for calcOFL for Operating model?? 
+    //if ((on=option_match(ad_comm::argc,ad_comm::argv,"-calcOFL_OpMod"))>-1) {
+      //  doOFL=1;
+        //rpt::echo<<"#OFL Op Mod calculations turned ON"<<endl;
+        //rpt::echo<<"#-------------------------------------------"<<endl;
+        //flg = 1;
+
+
     }
     //calcTAC
     if ((on=option_match(ad_comm::argc,ad_comm::argv,"-calcTAC"))>-1) {
@@ -740,6 +750,18 @@ DATA_SECTION
         rpt::echo<<"#-------------------------------------------"<<endl;
         flg = 1;
     }
+
+    //calcTAC_OpMod
+    //if ((on=option_match(ad_comm::argc,ad_comm::argv,"-calcTAC_OpMod"))>-1) {
+      //  doTAC = atoi(ad_comm::argv[on+1]);
+        //doOFL = 1;
+        //rpt::echo<<"#Calculating TAC for Op Mod using harvest control rule "<<doTAC<<endl;
+        //rpt::echo<<"#OFL calculations also turned ON "<<endl;
+        //rpt::echo<<"#-------------------------------------------"<<endl;
+        //flg = 1;
+    //}
+  
+    
     //run dynamic B0 calculations after final phase
     if ((on=option_match(ad_comm::argc,ad_comm::argv,"-calcDynB0"))>-1) {
         doDynB0 = 1;
@@ -1080,6 +1102,7 @@ DATA_SECTION
         if (debugModelOptions<0) exit(1);
         ModelOptions::debug=debugModelOptions;
     }
+    doTAC=ptrMOs->HCR;
     PRINT2B1("#--finished reading model options file---")
     rpt::echo<<"#------------------ModelOptions-----------------"<<endl;
     rpt::echo<<(*ptrMOs);
@@ -4337,6 +4360,160 @@ FUNCTION void calcOFL(int yr, int debug, ostream& cout)
         cout<<"finished calcOFL(yr,debug,cout)"<<endl<<endl<<endl;
     }
 //-------------END OFL Calculations----------   
+
+
+
+//------------OFL Calculations for Operating Model-------------
+//---------------EDITED BY MS 3/20/19---------------------------
+
+
+FUNCTION void calcOFL_OpMod(int debug, ostream& cout)
+    if (debug) {
+        cout<<endl<<endl<<"#------------------------"<<endl;
+        cout<<"starting calcOFL_OpMod(debug,cout)"<<endl;
+        //cout<<"year for projection = "<<yr<<endl;
+    }
+
+    //1. get initial population -- unlike calcOFL there is no year component
+
+    //dvar4_array n_xmsz = n_yxmsz(yr); Get rid of this line, as we don't want years
+
+    if (debug) {cout<<"  males_msz:"<<endl; wts::print(prj_n_xmsz(  MALE),cout,1);}
+    if (debug) {cout<<"females_msz:"<<endl; wts::print(prj_n_xmsz(FEMALE),cout,1);}
+    
+    //2. set yr back one year to get population rates, etc.,
+        // -----CHECK THIS, the Op model is the projection, so yr=yr 
+            
+    //yr = yr;//don't have pop rates, etc. for projection year --- KEEP YEAR AT YEAR?
+    //if (debug) cout<<"year for pop rates = "<<yr<<endl;
+    
+    //3. Determine mean recruitment --Keep this?
+        //NOT SURE IF THIS SHOULD BE ALTERED 
+    //   1981 here corresponds to 1982 in TCSAM2013, the year recruitment enters
+    //   the model population.
+    dvar_vector avgRec_x(1,nSXs); 
+  
+    if (debug) cout<<"R dims: "<<R_y.indexmin()<<cc<<R_y.indexmax()<<endl;
+    int yr = R_y.indexmax();
+    for (int x=1;x<=nSXs;x++) 
+        avgRec_x(x)= mean(ptrOMI->R_y(1981,yr))*ptrOMI->R_x(x);
+    if (debug) {
+        cout<<"Average recruitment = "<<avgRec_x<<endl;
+    }
+
+    //4. Identify population rates
+    double dtF = ptrOMI->dtF;//time at which fisheries occur
+    double dtM = ptrOMI->dtM;//time at which mating occurs
+    
+    PopDyInfo* pPIM = new PopDyInfo(nZBs);//  males info
+    pPIM->R_z = ptrOMI->R_z; //Recruitment by size
+    //pPIM->R_x = ptrOMI->R_x; // Recruitment by sex 
+    pPIM->w_mz  = ptrMDS->ptrBio->wAtZ_xmz(MALE); // changed to just sex
+    pPIM->M_msz = ptrOMI->M_xmsz(MALE);           // changed to just sex, added pointer
+    pPIM->T_szz = ptrOMI->prGr_xszz(MALE);        // changed to just sex, added pointer
+    for (int s=1;s<=nSCs;s++) pPIM->Th_sz(s) = ptrOMI->prM2M_xz(MALE); // changed to just sex, added pointer
+    
+    PopDyInfo* pPIF = new PopDyInfo(nZBs);//females info
+    pPIF->R_z = ptrOMI->R_z;  // = R_yz(yr);
+    //pPIM->R_x = ptrOMI->R_x; // Recruitment by sex 
+    pPIF->w_mz = ptrMDS->ptrBio->wAtZ_xmz(FEMALE);  // changed to just sex 
+    pPIF->M_msz = ptrOMI->M_xmsz(FEMALE);           // changed to just sex, added pointer
+    pPIF->T_szz = ptrOMI->prGr_xszz(FEMALE);        // changed to just sex, added pointer
+    for (int s=1;s<=nSCs;s++) pPIF->Th_sz(s) = ptrOMI->prM2M_xz(FEMALE); // changed to just sex, added pointer
+    if (debug) cout<<"calculated pPIM, pPIF."<<endl;
+    
+    //5. Determine fishery conditions for next year based on averages for recent years
+
+      // NOT SURE WHAT TO DO HERE --MS
+
+        int oflAvgPeriodYrs = 1;  //TODO: this should be an input
+
+        //assumption here is that ALL fisheries EXCEPT the first are bycatch fisheries
+        //a. Calculate average handling mortality, retention curves and capture rates
+        int ny;   //number of years fishery is active
+        dvar_vector avgHM_f(1,nFsh);
+        avgHM_f=ptrOMI->hmF_f;
+        
+        dvar5_array avgCapF_xfmsz(1,nSXs,1,nFsh,1,nMSs,1,nSCs,1,nZBs);//averaged fishery capture rates
+        dvar5_array avgRFcn_xfmsz(1,nSXs,1,nFsh,1,nMSs,1,nSCs,1,nZBs);//averaged retention function
+        avgCapF_xfmsz.initialize();
+        avgRFcn_xfmsz.initialize();
+        
+        for (int f=1;f<=nFsh;f++){ 
+            for (int x=1;x<=nSXs;x++){
+                for (int m=1;m<=nMSs;m++){
+                    for (int s=1;s<=nSCs;s++){ 
+                        avgCapF_xfmsz(x,f,m,s) = ptrOMI->cpF_fxmsz(f,x,m,s); 
+                        avgRFcn_xfmsz(x,f,m,s) = ptrOMI->ret_fxmsz(f,x,m,s);
+
+                    }//s
+                }//m
+            }//x
+        }//f
+        
+        CatchInfo* pCIM = new CatchInfo(nZBs,nFsh);//male catch info
+        pCIM->setCaptureRates(avgCapF_xfmsz(MALE));
+        //pCIM->setCaptureRates(avgCapF_xfms(MALE));
+        //pCIM->setSelectivityFcns(avgSFcn_xfmsz(MALE));
+        pCIM->setRetentionFcns(avgRFcn_xfmsz(MALE));
+        pCIM->setHandlingMortality(avgHM_f);
+        dvariable maxCapF = pCIM->findMaxTargetCaptureRate(cout);
+        if (debug) cout<<"maxCapF = "<<maxCapF<<endl;
+        
+        CatchInfo* pCIF = new CatchInfo(nZBs,nFsh);//female catch info
+        pCIF->setCaptureRates(avgCapF_xfmsz(FEMALE));
+        //pCIF->setCaptureRates(avgCapF_xfms(FEMALE));
+        //pCIF->setSelectivityFcns(avgSFcn_xfmsz(FEMALE));
+        pCIF->setRetentionFcns(avgRFcn_xfmsz(FEMALE));
+        pCIF->setHandlingMortality(avgHM_f);
+        pCIF->maxF = maxCapF;//need to set this for females
+        
+    //6. Create PopProjectors
+        PopProjector* pPPM = new PopProjector(pPIM,pCIM);
+        pPPM->dtF = dtF;
+        pPPM->dtM = dtM;
+        PopProjector* pPPF = new PopProjector(pPIF,pCIF);
+        pPPF->dtF = dtF;
+        pPPF->dtM = dtM;
+        if (debug) cout<<"created pPPs."<<endl;
+        
+    //7. Create Equilibrium_Calculators
+        Equilibrium_Calculator* pECM = new Equilibrium_Calculator(pPPM);
+        Equilibrium_Calculator* pECF = new Equilibrium_Calculator(pPPF);
+        if (debug) cout<<"created pECs."<<endl;
+        
+    //8. Define OFL_Calculator   
+        OFL_Calculator*  pOC;
+        if (debug) cout<<"declared pOC."<<endl;
+        
+    //9. Determine TIER LEVEL, define Tier_Calculators, calculate OFL
+        int tier = 3;
+        if (tier==3){
+            //5. Determine Fmsy and Bmsy
+            Tier3_Calculator* pT3CM = new Tier3_Calculator(0.35,pECM);
+            Tier3_Calculator* pT3CF = new Tier3_Calculator(0.35,pECF);
+            if (debug) cout<<"created pT3Cs."<<endl;
+            pOC = new OFL_Calculator(pT3CM,pT3CF);
+            if (debug) {
+                cout<<"created pOC."<<endl;
+                OFL_Calculator::debug=1;
+                Tier3_Calculator::debug=1;
+                Equilibrium_Calculator::debug=0;
+                cout<<"Calculating ptrOFLResults"<<endl;
+            }
+            ptrOFLResults = pOC->calcOFLResults(avgRec_x,prj_n_xmsz,cout);
+            if (debug) {
+                cout<<"calculated ptrOFLResults->"<<endl;
+                ptrOFLResults->writeCSVHeader(cout); cout<<endl;
+                ptrOFLResults->writeToCSV(cout); cout<<endl;
+                ptrOFLResults->writeToR(cout,ptrMC,"oflResults",0); cout<<endl;
+                OFL_Calculator::debug=0;
+                Tier3_Calculator::debug=0;
+                Equilibrium_Calculator::debug=0;
+            }
+        }//Tier 3 calculation
+    
+        PRINT2B1("OFL Op model function done")
         
 //-------------------------------------------------------------------------------------
 //Calculate penalties for objective function. TODO: finish
@@ -8085,43 +8262,378 @@ FUNCTION void writeEstModPinFile(int closed, ostream& os)
     ptrMPI->writePin(os);
     
 //-------------------------------------
-FUNCTION int calcTAC(int hcr, double OFL)  
+
+// TAC FUNCTIONS FOR ESTIMATION MODEL
+
+//-------------------------------------
+FUNCTION int calcTAC(int hcr, double OFL)  //int calcOption
     int closed = 1;
     double TAC = 0.0;
     adstring info;
 
 // Harvest Control Rule 1--Female Ramp
-    if (hcr==1){                             
+    if (hcr==1){ 
+        
+      // Identify Biomass 
+
         dmatrix vspB_yx = value(spB_yx);
         double MMB = vspB_yx(mxYr,  MALE);
         double MFB = vspB_yx(mxYr,FEMALE);
+        PRINT2B2("MMB_estmod=",MMB)
+        PRINT2B2("MFB_estmod=",MFB)
+
+      // Identify Biomass Average
         ivector perm(1,2); perm[1]=2;perm[2]=1; //transposing to move from sex and year to yr and sex 
         dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
-        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMFB = mean(vspB_xy(FEMALE)(1982,2017)); // test
+        //double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        PRINT2B2("aveMFB_estmod=",aveMFB)
+      //TAC Call
         TAC = HarvestStrategies::HCR1_FemaleRamp(MFB, aveMFB, MMB);
         info = "#--HCR1: MFB = "+str(MFB)+cc+"aveMFB = "+str(aveMFB)+cc+"ratio = "+str(MFB/aveMFB)+cc+"TAC = "+str(TAC);
     }
 
 // Harvest Control Rule 2--Male Ramp
-    if (hcr==2){                             
+    if (hcr==2){  
+
+    //Identify Biomass
         dmatrix vspB_yx = value(spB_yx);
         double MMB = vspB_yx(mxYr,  MALE);
+        PRINT2B2("MMB_estmod=",MMB)
+        
+    //Identify Biomass Average
         ivector perm(1,2); perm[1]=2;perm[2]=1; //what does this line do?
         dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
         double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));// HCRx,copy in for HCR2 in model options
+        PRINT2B2("aveMMB_estmod=",aveMMB)
+
+        PRINT2B1("#----Establish exploitation rate rampID")
         int rampID = ptrMOs->HCR2_rampID; // HAVE BUCK CHECK THIS rampID 
+        PRINT2B1("#----Testing rampID")
+        PRINT2B2("rampID=",rampID)
         TAC = HarvestStrategies::HCR2_MaleRamp(MMB, aveMMB, rampID);
         info = "#--HCR2: MMB = "+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"ratio = "+str(MMB/aveMMB)+cc+"TAC = "+str(TAC);
+    }
+
+// Harvest Control Rule 22--Male Ramp SURVEY ESTIMATES
+    if (hcr==22){         
+        
+        //Identify survey Biomass for the year 
+        
+        d6_array vn_vyxmsz = wts::value(n_vyxmsz);
+        d6_array vb_vyxmsz = tcsam::calcBiomass(vn_vyxmsz,ptrMDS->ptrBio->wAtZ_xmz);
+        double MMB = 0;
+
+            for (int s = 1; s<=2; s++){
+                for(int z=1;z<=nZBs;z++){
+                    MMB += value(vb_vyxmsz(1,mxYr,MALE,MATURE,s,z));
+                   }//z is size
+                }//s is shell
+        
+        //Indentify Long Term Average 
+        dmatrix vspB_yx = value(spB_yx);
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //what does this line do?
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));// HCRx,copy in for HCR2 in model options
+        //int rampID = ptrMOs->HCR2_rampID; // HAVE BUCK CHECK THIS rampID 
+        TAC = HarvestStrategies::HCR22_MaleRamp_SurvEst(MMB, aveMMB);
+        info = "#--HCR22: MMB = "+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"ratio = "+str(MMB/aveMMB)+cc+"TAC = "+str(TAC);
+    }
+
+
+// Harvest Control Rule 23--Male Ramp MODEL SURVEY ESTIMATES
+    if (hcr==23){      
+                       
+        // Define MMB 
+        
+        d3_array n_msz     = value(this->n_vyxmsz(1,mxYr,MALE)); // ESTIMATED male survey abundance in final year
+        dmatrix w_mz       = value(ptrMDS->ptrBio->wAtZ_xmz(MALE));   //weight at size
+        dvector MMB_z(20,32);MMB_z.initialize();
+                
+        for (int m=1;m<=nMSs;m++){                       //loops over maturity state
+            for (int s=1;s<=nMSs;s++){                   //loops over shell condition
+                MMB_z += elem_prod(n_msz(m,s)(20,32),w_mz(m)(20,32));
+            }
+        }                                
+        
+        double MMB = sum(MMB_z);
+
+        
+        // Define MMBAve
+        dmatrix vspB_yx = value(spB_yx);
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //what does this line do?
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));// HCRx,copy in for HCR2 in model options
+        //int rampID = ptrMOs->HCR2_rampID; // HAVE BUCK CHECK THIS rampID 
+        TAC = HarvestStrategies::HCR23_MaleRamp_ModSurvEst(MMB, aveMMB);
+        info = "#--HCR23: MMB = "+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"ratio = "+str(MMB/aveMMB)+cc+"TAC = "+str(TAC);
     }
 
 // Harvest Control Rule 3--ABC
     if (hcr==3){                             
         
-       int buffer = ptrMOs->HCR3_buffer; 
+       //double buffer = ptrMOs->HCR3_buffer; 
+       // HARD CODED BUFFER DUE TO ODD ESTIMATION OF VERY HIGH BUFFER, ASK BUCK HOW TO FIX 
+       PRINT2B1("-- BUFFER HAS BEEN HARD CODED AT 0.20!!!!!!!!! --")
+       double buffer = 0.20;
+       PRINT2B2 ("buffer=", buffer)
+       PRINT2B2 ("OFL=", OFL)
         TAC = HarvestStrategies::HCR3_ABC(OFL, buffer);
-        //ask what the info line is
-        //info = "#--HCR3: ABC = "+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"ratio = "+str(MMB/aveMMB)+cc+"TAC = "+str(TAC);
+        
+        info = "#--HCR3: buffer = "+str(buffer)+cc+"OFL = "+str(OFL)+cc+"TAC = "+str(TAC);
     }
+
+// Harvest Control Rule 4--Female Dimmer
+    if (hcr==4){                             
+        
+    // Define Biomass 
+
+       dmatrix vspB_yx = value(spB_yx);
+        double MMB = vspB_yx(mxYr,  MALE);
+        double MFB = vspB_yx(mxYr,FEMALE);
+
+   // Define Average Biomass
+        ivector perm(1,2); perm[1]=2;perm[2]=1;
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        TAC = HarvestStrategies::HCR4_FemaleDimmer(MFB, aveMFB, MMB, aveMMB);
+         info = "#--HCR4: MMB = "+str(MMB)+cc+"MFB = "+str(MFB)+cc+"aveMMB = "+str(aveMMB)+cc+"aveMFB = "+str(aveMFB);
+    }
+
+// Harvest Control Rule 5--FemaleBlocks
+    if (hcr==5){                             
+      
+    // Define Biomass
+       dmatrix vspB_yx = value(spB_yx);
+        double MMB = vspB_yx(mxYr,  MALE);
+        double MFB = vspB_yx(mxYr,FEMALE);
+
+    // Define Average Biomass
+        ivector perm(1,2); perm[1]=2;perm[2]=1;
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        TAC = HarvestStrategies::HCR5_FemaleBlocks(MFB, aveMFB, MMB, aveMMB);
+        // info = 
+    }
+
+// Harvest Control Rule 6--Exploitable Legal Males 
+    if (hcr==6){                             
+       
+    // Define Biomass 
+        dmatrix vspB_yx = value(spB_yx); 
+        ivector perm(1,2); perm[1]=2;perm[2]=1; // creating a 2d vector perm <- 2,1 
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx); 
+
+        //d3_array weights = ptrMDS->ptrBio->wAtZ_xmz; // array from pointer to a pointer with weights by sex, maturity, size   
+        dvector weights = ptrMDS->ptrBio->wAtZ_xmz(MALE, MATURE);
+        
+        double newshell = value(sum(n_yxmsz(mxYr,MALE,MATURE, NEW_SHELL)(20,32))); //n_yxmsz is 5d array by year, sex, maturity, stage, size
+        
+        double total = 0.0;
+        for (int s = 1; s<=nSCs; s++){
+             total += value(sum(n_yxmsz(mxYr, MALE, MATURE, s)(20,32))); 
+            }
+
+        double propNS = newshell/total;
+        
+        dvector abundELM(20,32);
+        abundELM.initialize();
+
+        for (int s = 1; s<=nSCs; s++){
+            abundELM += value(n_yxmsz(mxYr, MALE, MATURE, s)(20,32)); 
+            }
+        
+
+        double xpRate = ptrMOs->HCR6_xpRate; // exploitation rate
+        double sOS = ptrMOs->HCR6_sOS; // old shell selectivity
+
+        TAC = HarvestStrategies::HCR6_ELM(propNS,abundELM, weights, sOS, xpRate);
+        // info = 
+    }
+
+// Harvest Control Rule 7--"Status Quo" 
+    if (hcr==7){  
+        
+        double Fmsy        = value(ptrOFLResults->Fmsy);
+        d3_array selF_msz  = value(ptrOFLResults->pCIM->selF_fmsz(1));//pull out selectivity for directed fishery
+        d3_array M_msz     = value(ptrOFLResults->pPDIM->M_msz);      //natural mortality
+        d3_array n_msz     = value(this->n_vyxmsz(1,mxYr,MALE));      //ESTIMATED male survey abundance in final year
+        dmatrix w_mz       = value(ptrMDS->ptrBio->wAtZ_xmz(MALE));   //weight at size
+        dvector cpB_z(20,32); cpB_z.initialize();
+        for (int m=1;m<=nMSs;m++){                       //loops over maturity state
+            for (int s=1;s<=nMSs;s++){                   //loops over shell condition
+                cpB_z += elem_prod(selF_msz(m,s)(20,32),
+                                   elem_prod(exp(-M_msz(m,s)(20,32)),
+                                             elem_prod(n_msz(m,s)(20,32),w_mz(m)(20,32))
+                                            )
+                                                )*(1-exp(-Fmsy));       
+            }
+        }
+        double CWmsy = sum(cpB_z);
+        //now calculate TAC using the HCR
+        
+        // Identify Biomass
+        dmatrix vspB_yx = value(spB_yx);
+        double MMB = vspB_yx(mxYr,  MALE);
+        double MFB = vspB_yx(mxYr,FEMALE);
+
+        // Identify Average Biomass 
+        ivector perm(1,2); perm[1]=2;perm[2]=1;
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+             
+
+
+        TAC = HarvestStrategies::HCR7_StatusQuo(MFB,aveMFB, MMB, aveMMB, CWmsy); 
+        // Half TAC Rule
+        if(rmN_fyxmsz(1, mxYr, MALE, MATURE, 1, (20,32)) == 0) TAC = 0.5*TAC; // Half TAC rule VERIFY THIS DOES WHAT IT'S SUPPOSED TO
+            
+     
+    }
+
+   
+    if (TAC>0.0) closed=0;  // If there is a TAC the fishery is not closed 
+
+    //--save TAC and OFL to file for OpMod to read
+    adstring fn = "TAC_"+str(mxYr+1)+".txt";
+    ofstream os; os.open(fn, ios::trunc);
+    os<<"#---TAC, OFL for MSE OpMod"<<endl;
+    os<<"# TAC      OFL"<<endl;
+    os<<TAC<<tb<<OFL<<endl;
+    os<<endl;
+    os<<info<<endl;
+    os.close();
+    
+    return(closed);
+    
+
+//-------------------------------------
+FUNCTION double repTAC(int hcr, double OFL)  //int calcOption
+   
+    double TAC = 0.0;
+    adstring info;
+
+// Harvest Control Rule 1--Female Ramp
+    if (hcr==1){       
+
+       // ID Biomass 
+        dmatrix vspB_yx = value(spB_yx);
+        double MMB = vspB_yx(mxYr,  MALE);
+        PRINT2B2("MMB_estmodTAC=", MMB)
+        double MFB = vspB_yx(mxYr,FEMALE);
+        PRINT2B2("MFB_estmodTAC=", MFB)
+
+       //ID AveBiomass
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //transposing to move from sex and year to yr and sex 
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMFB = mean(vspB_xy(FEMALE)(1982,2017));
+        //double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        PRINT2B2("aveMFB_estmodTAC=", aveMFB)
+       // TAC 
+
+        TAC = HarvestStrategies::HCR1_FemaleRamp(MFB, aveMFB, MMB);
+        PRINT2B2("tac=", TAC)
+        info = "#--HCR1: MFB = "+str(MFB)+cc+"aveMFB = "+str(aveMFB)+cc+"ratio = "+str(MFB/aveMFB)+cc+"TAC = "+str(TAC);
+    }
+
+// Harvest Control Rule 2--Male Ramp
+    if (hcr==2){     
+        
+        //Identify Biomass
+        dmatrix vspB_yx = value(spB_yx);
+        double MMB = vspB_yx(mxYr,  MALE);
+        PRINT2B2("MMB_estmod=",MMB)
+        
+        //Identify Biomass Average
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //what does this line do?
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));// HCRx,copy in for HCR2 in model options
+        PRINT2B2("aveMMB_estmod=",aveMMB)
+
+        PRINT2B1("#----Establish exploitation rate rampID")
+        int rampID = ptrMOs->HCR2_rampID; // HAVE BUCK CHECK THIS rampID 
+        PRINT2B1("#----Testing rampID")
+        PRINT2B2("rampID=",rampID)
+        TAC = HarvestStrategies::HCR2_MaleRamp(MMB, aveMMB, rampID);
+
+        info = "#--HCR2: MMB = "+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"ratio = "+str(MMB/aveMMB)+cc+"TAC = "+str(TAC);
+    }
+
+// Harvest Control Rule 22--Male Ramp SURVEY ESTIMATES 
+    if (hcr==22){                             
+             
+        //Identify survey Biomass for the year 
+        
+        d6_array vn_vyxmsz = wts::value(n_vyxmsz);
+        d6_array vb_vyxmsz = tcsam::calcBiomass(vn_vyxmsz,ptrMDS->ptrBio->wAtZ_xmz);
+        double MMB = 0;
+
+            for (int s = 1; s<=2; s++){
+                for(int z=1;z<=nZBs;z++){
+                    MMB += value(vb_vyxmsz(1,mxYr,MALE,MATURE,s,z));
+                   }//z is size
+                }//s is shell
+        
+        //Indentify Long Term Average 
+        dmatrix vspB_yx = value(spB_yx);
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //what does this line do?
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));// HCRx,copy in for HCR2 in model options
+        //int rampID = ptrMOs->HCR2_rampID; // HAVE BUCK CHECK THIS rampID 
+        TAC = HarvestStrategies::HCR22_MaleRamp_SurvEst(MMB, aveMMB);
+        info = "#--HCR22: MMB = "+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"ratio = "+str(MMB/aveMMB)+cc+"TAC = "+str(TAC);
+ }
+
+// Harvest Control Rule 23--Male Ramp MODEL SURVEY ESTIMATES 
+    if (hcr==23){    
+
+        // Define MMB 
+        
+        d3_array n_msz     = value(this->n_vyxmsz(1,mxYr,MALE)); // ESTIMATED male survey abundance in final year
+        dmatrix w_mz       = value(ptrMDS->ptrBio->wAtZ_xmz(MALE));   //weight at size
+        dvector MMB_z(20,32);MMB_z.initialize();
+                
+        for (int m=1;m<=nMSs;m++){                       //loops over maturity state
+            for (int s=1;s<=nMSs;s++){                   //loops over shell condition
+                MMB_z += elem_prod(n_msz(m,s)(20,32),w_mz(m)(20,32));
+            }
+        }                                
+        
+        double MMB = sum(MMB_z);
+
+        
+        // Define MMBAve
+        dmatrix vspB_yx = value(spB_yx);
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //what does this line do?
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));// HCRx,copy in for HCR2 in model options
+        //int rampID = ptrMOs->HCR2_rampID; // HAVE BUCK CHECK THIS rampID 
+        TAC = HarvestStrategies::HCR23_MaleRamp_ModSurvEst(MMB, aveMMB);
+        info = "#--HCR23: MMB = "+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"ratio = "+str(MMB/aveMMB)+cc+"TAC = "+str(TAC);
+    }
+
+// Harvest Control Rule 3--ABC
+    if (hcr==3){  
+
+       // ID buffer from model options 
+       double buffer = ptrMOs->HCR3_buffer; 
+       // HARD CODED BUFFER DUE TO BUFFER at 0 or ODD ESTIMATION OF VERY HIGH BUFFER, ASK BUCK HOW TO FIX 
+       //PRINT2B1("-- BUFFER HAS BEEN HARD CODED AT 0.20!!!!!!!!! --")
+       //double buffer = 0.20;
+      
+       PRINT2B2 ("buffer=", buffer)
+
+       //does the OFL function need to be called?
+       PRINT2B2 ("OFL=", OFL)
+
+        TAC = HarvestStrategies::HCR3_ABC(OFL, buffer);
+        
+        info = "#--HCR3: buffer = "+str(buffer)+cc+"OFL = "+str(OFL)+cc+"TAC = "+str(TAC);
+
+        }
 
 // Harvest Control Rule 4--Female Dimmer
     if (hcr==4){                             
@@ -8215,15 +8727,303 @@ FUNCTION int calcTAC(int hcr, double OFL)
         double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
              
 
-
-        TAC = HarvestStrategies::HCR7_StatusQuo(MFB,aveMFB, MMB, aveMMB, CWmsy); // FIX END
-        
-            // need to add a half TAC rule --> look at retained catch in mcYr-1 in directed fishery 
-                
+        TAC = HarvestStrategies::HCR7_StatusQuo(MFB,aveMFB, MMB, aveMMB, CWmsy); 
+        // Half TAC Rule
+        if(rmN_fyxmsz(1, mxYr, MALE, MATURE, 1, (20,32)) == 0) TAC = 0.5*TAC; // Half TAC rule VERIFY THIS DOES WHAT IT'S SUPPOSED TO           
+     
     }
 
-    //if(rmN_fyxmsz(1, mxYr-1, MALE, MATURE, 1, (20,32)) == 0) //put a counter here at some point
-    if(rmN_fyxmsz(1, mxYr-1, MALE, MATURE, 1, (20,32)) == 0) TAC = 0.5*TAC; // Half TAC rule VERIFY THIS DOES WHAT IT'S SUPPOSED TO
+ 
+    //--save TAC and OFL to file for OpMod to read
+    //adstring fn = "TAC_"+str(mxYr+1)+".txt";
+    //ofstream os; os.open(fn, ios::trunc);
+    //os<<"#---TAC, OFL for MSE OpMod"<<endl;
+    //os<<"# TAC      OFL"<<endl;
+    //os<<TAC<<tb<<OFL<<endl;
+    //os<<endl;
+    //os<<info<<endl;
+    //os.close();
+    
+    return(TAC);
+    
+//--------------------------
+//++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+// TAC Functions for Operating Model
+//
+//+++++++++++++++++++++++++++++++++++++++++++++++++
+
+FUNCTION int calcTAC_OpMod(int hcr, double OFL)  //int calcOption
+    
+    int closed = 1;
+    double TAC = 0.0;
+    adstring info;
+
+// Harvest Control Rule 1--Female Ramp
+    if (hcr==1){ 
+        
+    //Calculate MMB and MFB from projections 
+        
+        // Create the vector to hold the value 
+        dvector vspB_x = value(prj_spB_x);
+        PRINT2B2("vspB_x_OpModTest=", vspB_x)
+
+        //Call the calculation for projected spawning biomass
+        //for (int x=1;x<=nSXs;x++){ 
+          //  prj_spB_x(x)= pPPr->getMatureBiomassAtMating();
+        //}
+        //PRINT2B2("prj_spB_x=", prj_spB_x)
+
+        double MMB = value(prj_spB_x(MALE));
+        PRINT2B2("MMB_opmodTAC=", MMB)
+        double MFB = value(prj_spB_x(FEMALE));
+        PRINT2B2("MFB_opmodTAC=", MFB)
+        
+
+     //Calculate ave MFB 
+      
+        //int y = 1982;
+        //int maxYr = 2017;
+            //for( int x=1;x<=nSXs;x++){
+                //for( y=mnYr;y<=maxYr;y++){
+                    //spB_yx = pPPr->getMatureBiomassAtMating();
+                   // }  //y 
+                  //} // x 
+        
+   
+    //int yr = R_y.indexmax();
+    //for (int x=1;x<=nSXs;x++) 
+    //avgRec_x(x)= mean(ptrOMI->R_y(1981,yr))*ptrOMI->R_x(x);
+
+        dmatrix vspB_yx = value(spB_yx);
+        PRINT2B2("SpB_yx", vspB_yx);
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //transposing to move from sex and year to yr and sex 
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        //double aveMFB = mean(vspB_xy(FEMALE)(1982,2017));
+
+        // HARD CODED AVERAGE NUMBER,  COME BACK TO THIS 
+        PRINT2B1( "#----HARD CODED AVERAGE MFB!!!!! COME BACK TO THIS!!!")
+        double aveMFB = 23.5;
+
+        //double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        PRINT2B2("aveMFB_opmodTAC=", aveMFB)
+
+        TAC = HarvestStrategies::HCR1_FemaleRamp(MFB, aveMFB, MMB);
+        double ratio = MFB/aveMFB;
+        info = "#--HCR1: MFB = "+str(MFB)+cc+"aveMFB_test = "+str(aveMFB)+cc+"ratio = "+str(ratio)+cc+"TAC = "+str(TAC);
+    }
+
+// Harvest Control Rule 2--Male Ramp
+    if (hcr==2){  
+         
+        // Define projected MMB
+        dvector vspB_x = value(prj_spB_x);
+        double MMB = vspB_x(MALE);
+        PRINT2B2("MMB_Opmod=",MMB)
+        
+        //Define Average MMB
+        dmatrix vspB_yx = value(spB_yx);
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //permutates year and sex in matrix structure
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        //double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));// HCRx,copy in for HCR2 in model options
+        
+        PRINT2B1( "#----HARD CODED AVERAGE MMB!!!!! COME BACK TO THIS!!!")
+        double aveMMB = 51.6;
+        PRINT2B2("aveMMB_Opmod=",aveMMB)
+        
+        
+        // Ramp for exploitation 
+        PRINT2B1("#----Establish exploitation rate rampID")
+        int rampID = ptrMOs->HCR2_rampID; // HAVE BUCK CHECK THIS rampID 
+        PRINT2B1("#testing rampID")
+        PRINT2B2("rampID_opMod=",rampID)
+        TAC = HarvestStrategies::HCR2_MaleRamp(MMB, aveMMB, rampID);
+
+        info = "#--HCR2: MMB = "+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"ratio = "+str(MMB/aveMMB)+cc+"TAC = "+str(TAC);
+    }
+    
+// Harvest Control Rule 22--Male Ramp <- SURVEY BIOMASS ESTIMATES 
+    if (hcr==22){  
+         
+        // Define projected MMB
+        d3_array n_msz     = value(this->prj_n_vxmsz(1,MALE)); // ESTIMATED male survey abundance in final year
+        dmatrix w_mz       = value(ptrMDS->ptrBio->wAtZ_xmz(MALE));   //weight at size
+        dvector MMB_z(20,32);MMB_z.initialize();
+                
+        for (int m=1;m<=nMSs;m++){                       //loops over maturity state
+            for (int s=1;s<=nMSs;s++){                   //loops over shell condition
+                MMB_z += elem_prod(n_msz(m,s)(20,32),w_mz(m)(20,32));
+            }
+        }                                
+        
+        double MMB = sum(MMB_z);
+        
+        //Define Average MMB
+        dmatrix vspB_yx = value(spB_yx);
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //permutates year and sex in matrix structure
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));// HCRx,copy in for HCR2 in model options
+        //int rampID = ptrMOs->HCR2_rampID; // HAVE BUCK CHECK THIS rampID 
+        TAC = HarvestStrategies::HCR22_MaleRamp_SurvEst(MMB, aveMMB);
+        info = "#--HCR22: MMB = "+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"ratio = "+str(MMB/aveMMB)+cc+"TAC = "+str(TAC);
+    
+        }
+
+// Harvest Control Rule 23--Male Ramp <- MODEL SURVEY BIOMASS ESIMATES 
+    if (hcr==23){  
+         
+        // Define projected MMB
+        d3_array n_msz     = value(this->prj_n_vxmsz(1,MALE)); // ESTIMATED male survey abundance in final year
+        dmatrix w_mz       = value(ptrMDS->ptrBio->wAtZ_xmz(MALE));   //weight at size
+        dvector MMB_z(20,32);MMB_z.initialize();
+                
+        for (int m=1;m<=nMSs;m++){                       //loops over maturity state
+            for (int s=1;s<=nMSs;s++){                   //loops over shell condition
+                MMB_z += elem_prod(n_msz(m,s)(20,32),w_mz(m)(20,32));
+            }
+        }                                
+        
+        double MMB = sum(MMB_z);
+        
+        //Define Average MMB
+        dmatrix vspB_yx = value(spB_yx);
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //permutates year and sex in matrix structure
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));// HCRx,copy in for HCR2 in model options
+        //int rampID = ptrMOs->HCR2_rampID; // HAVE BUCK CHECK THIS rampID 
+        TAC = HarvestStrategies::HCR23_MaleRamp_ModSurvEst(MMB, aveMMB);
+        info = "#--HCR23: MMB = "+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"ratio = "+str(MMB/aveMMB)+cc+"TAC = "+str(TAC);
+    }
+
+// Harvest Control Rule 3--ABC
+    if (hcr==3){                             
+        
+       // ID buffer from Model options 
+       double buffer = ptrMOs->HCR3_buffer; 
+       // HARD CODED BUFFER DUE TO BUFFER at 0 or ODD ESTIMATION OF VERY HIGH BUFFER, ASK BUCK HOW TO FIX 
+       //PRINT2B1("-- BUFFER HAS BEEN HARD CODED AT 0.20!!!!!!!!! --")
+       //double buffer = 0.20;
+       PRINT2B2("Buffer_opMod=",buffer)
+       
+       //does OFL function need to be called?
+       PRINT2B2("OFL_opMod=", OFL)
+
+        TAC = HarvestStrategies::HCR3_ABC(OFL, buffer); // ASK ABOUT THIS LINE, OP OFL?
+        
+
+        info = "#--HCR3: buffer = "+str(buffer)+cc+"OFL = "+str(OFL)+cc+"TAC = "+str(TAC);
+    }
+
+// Harvest Control Rule 4--Female Dimmer
+    if (hcr==4){                             
+        
+        // ID biomass for males and females for  OP MOD using prj_spB
+        dvector vspB_x = value(prj_spB_x);
+        double MMB = vspB_x(MALE);
+        double MFB = vspB_x(FEMALE);
+
+        // Averages for Male and Female Biomass 
+        dmatrix vspB_yx = value(spB_yx);
+        ivector perm(1,2); perm[1]=2;perm[2]=1;
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        TAC = HarvestStrategies::HCR4_FemaleDimmer(MFB, aveMFB, MMB, aveMMB);
+        // info = "#--HCR4: MMB = "+str(MMB)+cc+"MFB = "+str(MFB)+cc+"aveMMB = "+str(aveMMB)+cc+"aveMFB = "+str(aveMFB);
+    }
+
+// Harvest Control Rule 5--FemaleBlocks
+    if (hcr==5){      
+
+        // ID biomass for males and females for  OP MOD using prj_spB
+        dvector vspB_x = value(prj_spB_x);
+        double MMB = vspB_x(MALE);
+        double MFB = vspB_x(FEMALE);
+        
+        // Averages for Male and Female Biomass 
+        dmatrix vspB_yx = value(spB_yx);
+        ivector perm(1,2); perm[1]=2;perm[2]=1;
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        TAC = HarvestStrategies::HCR5_FemaleBlocks(MFB, aveMFB, MMB, aveMMB);
+        // info = 
+    }
+
+// NOT YET DONE 
+// Harvest Control Rule 6--Exploitable Legal Males 
+    if (hcr==6){                             
+       
+        //d3_array weights = ptrMDS->ptrBio->wAtZ_xmz; // array from pointer to a pointer with weights by sex, maturity, size   
+        dvector weights = ptrMDS->ptrBio->wAtZ_xmz(MALE, MATURE);
+        
+        //Calc only newshell mature males 
+        double newshell = value(sum(prj_n_xmsz(MALE,MATURE, NEW_SHELL)(20,32))); // 
+        
+        //Calculate total mature males 
+        double total = 0.0;
+        for (int s = 1; s<=nSCs; s++){
+             total += value(sum(prj_n_xmsz(MALE, MATURE, s)(20,32))); //WHY SUM
+            }
+
+        double propNS = newshell/total;
+        
+        dvector abundELM(20,32);
+        abundELM.initialize();
+
+        for (int s = 1; s<=nSCs; s++){
+            abundELM += value(prj_n_xmsz(MALE, MATURE, s)(20,32)); // WHY NO SUM
+            }
+        
+
+        double xpRate = ptrMOs->HCR6_xpRate; // exploitation rate
+        double sOS = ptrMOs->HCR6_sOS; // old shell selectivity
+
+        TAC = HarvestStrategies::HCR6_ELM(propNS,abundELM, weights, sOS, xpRate);
+        // info = 
+    }
+
+// Harvest Control Rule 7--"Status Quo" 
+    if (hcr==7){  
+        
+        double Fmsy        = value(ptrOFLResults->Fmsy);
+        d3_array selF_msz  = value(ptrOFLResults->pCIM->selF_fmsz(1));//pull out selectivity for directed fishery
+        d3_array M_msz     = value(ptrOFLResults->pPDIM->M_msz);      //natural mortality
+        d3_array n_msz     = value(this->prj_n_vxmsz(1,MALE));      //ESTIMATED male survey abundance in final year
+        dmatrix w_mz       = value(ptrMDS->ptrBio->wAtZ_xmz(MALE));   //weight at size
+        dvector cpB_z(20,32); cpB_z.initialize();
+        for (int m=1;m<=nMSs;m++){                       //loops over maturity state
+            for (int s=1;s<=nMSs;s++){                   //loops over shell condition
+                cpB_z += elem_prod(selF_msz(m,s)(20,32),
+                                   elem_prod(exp(-M_msz(m,s)(20,32)),
+                                             elem_prod(n_msz(m,s)(20,32),w_mz(m)(20,32))
+                                            )
+                                                )*(1-exp(-Fmsy));       
+            }
+        }
+        double CWmsy = sum(cpB_z);
+        //now calculate TAC using the HCR
+       
+        // Biomass for projectected year 
+        dvector vspB_x = value(prj_spB_x);
+        double MMB = vspB_x(MALE);
+        double MFB = vspB_x(FEMALE);
+
+        dmatrix vspB_yx = value(spB_yx);
+        ivector perm(1,2); perm[1]=2;perm[2]=1;
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+             
+
+        TAC = HarvestStrategies::HCR7_StatusQuo(MFB,aveMFB, MMB, aveMMB, CWmsy); 
+    //----------------------------------    
+        // Half TAC Rule CHECK ME
+        //if(prj_rmN_fxmsz(1, MALE, MATURE, 1, (20,32)) == 0) TAC = 0.5*TAC; // Half TAC rule VERIFY THIS DOES WHAT IT'S SUPPOSED TO           
+    //------------------------------------ 
+    
+    }
+   
     if (TAC>0.0) closed=0;  // If there is a TAC the fishery is not closed 
 
     //--save TAC and OFL to file for OpMod to read
@@ -8237,8 +9037,294 @@ FUNCTION int calcTAC(int hcr, double OFL)
     os.close();
     
     return(closed);
+
+
+
+//--------------------------
+
+FUNCTION double repTAC_OpMod(int hcr, double OFL)  //int calcOption
     
-//----------------------
+    int closed = 1;
+    double TAC = 0.0;
+    adstring info;
+
+// Harvest Control Rule 1--Female Ramp
+    if (hcr==1){ 
+            
+   //Calculate MMB and MFB from projections 
+        
+        // Create the vector to hold the value 
+        dvector vspB_x = value(prj_spB_x);
+        PRINT2B2("vspB_x_OpModTest=", vspB_x)
+
+        //Call the calculation for projected spawning biomass
+        //for (int x=1;x<=nSXs;x++){ 
+          //  prj_spB_x(x)= pPPr->getMatureBiomassAtMating();
+        //}
+        //PRINT2B2("prj_spB_x=", prj_spB_x)
+
+        double MMB = value(prj_spB_x(MALE));
+        PRINT2B2("MMB_opmodTAC=", MMB)
+        double MFB = value(prj_spB_x(FEMALE));
+        PRINT2B2("MFB_opmodTAC=", MFB)
+        
+
+     //Calculate ave MFB 
+      
+       
+        //int y = 1982;
+        //int maxYr = 2017;
+            //for( int x=1;x<=nSXs;x++){
+                //for( y=mnYr;y<=maxYr;y++){
+                    //spB_yx = pPPr->getMatureBiomassAtMating();
+                   // }  //y 
+                  //} // x 
+        
+   
+    //int yr = R_y.indexmax();
+    //for (int x=1;x<=nSXs;x++) 
+    //avgRec_x(x)= mean(ptrOMI->R_y(1981,yr))*ptrOMI->R_x(x);
+
+        dmatrix vspB_yx = value(spB_yx);
+        PRINT2B2("SpB_yx", vspB_yx);
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //transposing to move from sex and year to yr and sex 
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        //double aveMFB = mean(vspB_xy(FEMALE)(1982,2017));
+
+        // HARD CODED AVERAGE NUMBER,  COME BACK TO THIS 
+        PRINT2B1( "#----HARD CODED AVERAGE MFB!!!!! COME BACK TO THIS!!!")
+        double aveMFB = 23.5;
+
+        //double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        PRINT2B2("aveMFB_opmodTAC=", aveMFB)
+
+        TAC = HarvestStrategies::HCR1_FemaleRamp(MFB, aveMFB, MMB);
+        double ratio = MFB/aveMFB;
+        info = "#--HCR1: MFB = "+str(MFB)+cc+"aveMFB_test = "+str(aveMFB)+cc+"ratio = "+str(ratio)+cc+"TAC = "+str(TAC);
+         
+        }
+
+// Harvest Control Rule 2--Male Ramp
+    if (hcr==2){  
+         
+        // Define projected MMB
+        dvector vspB_x = value(prj_spB_x);
+        double MMB = vspB_x(MALE);
+        PRINT2B2("MMB_Opmod=",MMB)
+        
+        //Define Average MMB
+
+        dmatrix vspB_yx = value(spB_yx);
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //permutates year and sex in matrix structure
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        //double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));// HCRx,copy in for HCR2 in model options
+        
+        PRINT2B1( "#----HARD CODED AVERAGE MMB!!!!! COME BACK TO THIS!!!")
+        double aveMMB = 51.6;
+        PRINT2B2("aveMMB_Opmod=",aveMMB)
+        
+        // Ramp for exploitation 
+        PRINT2B1("#----Establish exploitation rate rampID")
+        int rampID = ptrMOs->HCR2_rampID; // HAVE BUCK CHECK THIS rampID 
+        PRINT2B1("#Testing rampID")
+        PRINT2B2("rampID_opMod=",rampID)
+        TAC = HarvestStrategies::HCR2_MaleRamp(MMB, aveMMB, rampID);
+
+        info = "#--HCR2: MMB = "+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"ratio = "+str(MMB/aveMMB)+cc+"TAC = "+str(TAC);
+    }
+
+// Harvest Control Rule 22--Male Ramp <- SURVEY BIOMASS ESIMATES 
+    if (hcr==22){  
+         
+        // Define projected MMB
+        dvector vspB_x = value(prj_spB_x);
+        double MMB = vspB_x(MALE);
+        
+        //Define Average MMB
+        dmatrix vspB_yx = value(spB_yx);
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //permutates year and sex in matrix structure
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));// HCRx,copy in for HCR2 in model options
+        //int rampID = ptrMOs->HCR2_rampID; // HAVE BUCK CHECK THIS rampID 
+        TAC = HarvestStrategies::HCR22_MaleRamp_SurvEst(MMB, aveMMB);
+        info = "#--HCR2: MMB = "+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"ratio = "+str(MMB/aveMMB)+cc+"TAC = "+str(TAC);
+    }
+
+// Harvest Control Rule 23--Male Ramp <- MODEL SURVEY BIOMASS ESIMATES 
+    if (hcr==23){  
+         
+        // Define projected MMB
+        d3_array n_msz     = value(this->prj_n_vxmsz(1,MALE)); // ESTIMATED male survey abundance in final year
+        dmatrix w_mz       = value(ptrMDS->ptrBio->wAtZ_xmz(MALE));   //weight at size
+        dvector MMB_z(20,32);MMB_z.initialize();
+                
+        for (int m=1;m<=nMSs;m++){                       //loops over maturity state
+            for (int s=1;s<=nMSs;s++){                   //loops over shell condition
+                MMB_z += elem_prod(n_msz(m,s)(20,32),w_mz(m)(20,32));
+            }
+        }                                
+        
+        double MMB = sum(MMB_z);
+        
+        //Define Average MMB
+        dmatrix vspB_yx = value(spB_yx);
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //permutates year and sex in matrix structure
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));// HCRx,copy in for HCR2 in model options
+        //int rampID = ptrMOs->HCR2_rampID; // HAVE BUCK CHECK THIS rampID 
+        TAC = HarvestStrategies::HCR23_MaleRamp_ModSurvEst(MMB, aveMMB);
+        info = "#--HCR2: MMB = "+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"ratio = "+str(MMB/aveMMB)+cc+"TAC = "+str(TAC);
+    }
+
+// Harvest Control Rule 3--ABC
+    if (hcr==3){                             
+        
+        // ID buffer from Model options 
+        double buffer = ptrMOs->HCR3_buffer; 
+        // HARD CODED BUFFER DUE TO BUFFER at 0 or ODD ESTIMATION OF VERY HIGH BUFFER, ASK BUCK HOW TO FIX 
+       //PRINT2B1("-- BUFFER HAS BEEN HARD CODED AT 0.20!!!!!!!!! --")
+       //double buffer = 0.20;
+       PRINT2B2("Buffer_opMod=",buffer)
+       
+       //does OFL function need to be called?
+       PRINT2B2("OFL_opMod=", OFL)
+
+        TAC = HarvestStrategies::HCR3_ABC(OFL, buffer); // ASK ABOUT THIS LINE, OP OFL?
+       
+        info = "#--HCR3: buffer = "+str(buffer)+cc+"OFL = "+str(OFL)+cc+"TAC = "+str(TAC);
+
+       }
+
+// Harvest Control Rule 4--Female Dimmer
+    if (hcr==4){                             
+        
+        // ID biomass for males and females for  OP MOD using prj_spB
+        dvector vspB_x = value(prj_spB_x);
+        double MMB = vspB_x(MALE);
+        double MFB = vspB_x(FEMALE);
+
+        // Averages for Male and Female Biomass 
+        dmatrix vspB_yx = value(spB_yx);
+        ivector perm(1,2); perm[1]=2;perm[2]=1;
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        TAC = HarvestStrategies::HCR4_FemaleDimmer(MFB, aveMFB, MMB, aveMMB);
+        // info = "#--HCR4: MMB = "+str(MMB)+cc+"MFB = "+str(MFB)+cc+"aveMMB = "+str(aveMMB)+cc+"aveMFB = "+str(aveMFB);
+    }
+
+// Harvest Control Rule 5--FemaleBlocks
+    if (hcr==5){      
+
+        // ID biomass for males and females for  OP MOD using prj_spB
+        dvector vspB_x = value(prj_spB_x);
+        double MMB = vspB_x(MALE);
+        double MFB = vspB_x(FEMALE);
+        
+        // Averages for Male and Female Biomass 
+        dmatrix vspB_yx = value(spB_yx);
+        ivector perm(1,2); perm[1]=2;perm[2]=1;
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        TAC = HarvestStrategies::HCR5_FemaleBlocks(MFB, aveMFB, MMB, aveMMB);
+        // info = 
+    }
+
+// Harvest Control Rule 6--Exploitable Legal Males 
+    if (hcr==6){                             
+       
+        //d3_array weights = ptrMDS->ptrBio->wAtZ_xmz; // array from pointer to a pointer with weights by sex, maturity, size   
+        dvector weights = ptrMDS->ptrBio->wAtZ_xmz(MALE, MATURE);
+        
+        //Calc only newshell mature males 
+        double newshell = value(sum(prj_n_xmsz(MALE,MATURE, NEW_SHELL)(20,32))); // 
+        
+        //Calculate total mature males 
+        double total = 0.0;
+        for (int s = 1; s<=nSCs; s++){
+             total += value(sum(prj_n_xmsz(MALE, MATURE, s)(20,32))); //WHY SUM
+            }
+
+        double propNS = newshell/total;
+        
+        dvector abundELM(20,32);
+        abundELM.initialize();
+
+        for (int s = 1; s<=nSCs; s++){
+            abundELM += value(prj_n_xmsz(MALE, MATURE, s)(20,32)); // WHY NO SUM
+            }
+        
+
+        double xpRate = ptrMOs->HCR6_xpRate; // exploitation rate
+        double sOS = ptrMOs->HCR6_sOS; // old shell selectivity
+
+        TAC = HarvestStrategies::HCR6_ELM(propNS,abundELM, weights, sOS, xpRate);
+        // info = 
+    }
+
+    // Harvest Control Rule 7--"Status Quo" 
+    if (hcr==7){  
+        
+        double Fmsy        = value(ptrOFLResults->Fmsy);
+        d3_array selF_msz  = value(ptrOFLResults->pCIM->selF_fmsz(1));//pull out selectivity for directed fishery
+        d3_array M_msz     = value(ptrOFLResults->pPDIM->M_msz);      //natural mortality
+        d3_array n_msz     = value(this->prj_n_vxmsz(1,MALE));      //ESTIMATED male survey abundance in final year
+        dmatrix w_mz       = value(ptrMDS->ptrBio->wAtZ_xmz(MALE));   //weight at size
+        dvector cpB_z(20,32); cpB_z.initialize();
+        for (int m=1;m<=nMSs;m++){                       //loops over maturity state
+            for (int s=1;s<=nMSs;s++){                   //loops over shell condition
+                cpB_z += elem_prod(selF_msz(m,s)(20,32),
+                                   elem_prod(exp(-M_msz(m,s)(20,32)),
+                                             elem_prod(n_msz(m,s)(20,32),w_mz(m)(20,32))
+                                            )
+                                                )*(1-exp(-Fmsy));       
+            }
+        }
+        double CWmsy = sum(cpB_z);
+        //now calculate TAC using the HCR
+       
+        // Biomass for projectected year 
+        dvector vspB_x = value(prj_spB_x);
+        double MMB = vspB_x(MALE);
+        double MFB = vspB_x(FEMALE);
+
+        dmatrix vspB_yx = value(spB_yx);
+        ivector perm(1,2); perm[1]=2;perm[2]=1;
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+             
+
+        TAC = HarvestStrategies::HCR7_StatusQuo(MFB,aveMFB, MMB, aveMMB, CWmsy); 
+    //----------------------------------    
+        // Half TAC Rule CHECK ME
+        //if(prj_rmN_fxmsz(1, MALE, MATURE, 1, (20,32)) == 0) TAC = 0.5*TAC; // Half TAC rule VERIFY THIS DOES WHAT IT'S SUPPOSED TO           
+    //------------------------------------ 
+    
+    }
+
+//Fill in other HCR as you go for Operating model 
+
+   
+    if (TAC>0.0) closed=0;  // If there is a TAC the fishery is not closed 
+
+    //--save TAC and OFL to file for OpMod to read
+    adstring fn = "TAC_"+str(mxYr+1)+".txt";
+    ofstream os; os.open(fn, ios::trunc);
+    os<<"#---TAC, OFL for MSE OpMod"<<endl;
+    os<<"# TAC      OFL"<<endl;
+    os<<TAC<<tb<<OFL<<endl;
+    os<<endl;
+    os<<info<<endl;
+    os.close();
+    
+    return(TAC);
+
+
+
+
+//--------------------------
 FUNCTION finishOpModMode
     PRINT2B1("#----MSE OpModMode: Recalculating population dynamics")
     if (inpTAC>0.0){
@@ -8362,27 +9448,77 @@ FUNCTION finishOpModMode
     ofs.close();
     }
 
+    
+    //SEE if FIXES TAC 
+    
+
     //--calculate OFL
         {
-            cout<<"#----Starting OFL calculations"<<endl;
-            ofstream echoOFL_OpMod; echoOFL_OpMod.open("calcOFL_OpMod.final.txt", ios::trunc);//changed name?
-            echoOFL_OpMod.precision(12);
-            calcOFL(mxYr+1,1,echoOFL_OpMod);//updates ptrOFLResults
-            ptrOFLResults->writeCSVHeader(echoOFL_OpMod); echoOFL_OpMod<<endl;
-            ptrOFLResults->writeToCSV(echoOFL_OpMod);     echoOFL_OpMod<<endl;
-            echoOFL_OpMod.close();
-            cout<<"#----Finished OFL calculations"<<endl;
+           cout<<"#----Starting OFL calculations for Operating Model"<<endl;
+           ofstream echoOFL_OpMod; echoOFL_OpMod.open("calcOFL_OpMod.final.txt", ios::trunc);//changed name?
+           echoOFL_OpMod.precision(12);
+           calcOFL_OpMod(1,echoOFL_OpMod);//updates ptrOFLResults
+           ptrOFLResults->writeCSVHeader(echoOFL_OpMod); echoOFL_OpMod<<endl;
+           ptrOFLResults->writeToCSV(echoOFL_OpMod);     echoOFL_OpMod<<endl;
+           echoOFL_OpMod.close();
+           cout<<"#----Finished OFL calculations"<<endl;
         }
         
     //--calculate TAC for upcoming year using harvest control rule
-        { 
+         
             cout<<"#----Starting TAC calculations"<<endl;
-            int closed = calcTAC(doTAC, value(ptrOFLResults->OFL));
-        }
-
+            calcTAC_OpMod(doTAC, value(ptrOFLResults->OFL));
+            //int closed calcTAC(doTAC, value(ptrOFLResults->OFL));
+            //PRINT2B2("TAC for opMod =", calcTAC(doTAC, value(ptrOFLResults->OFL)))
+   
     //-- performance metrics for Operating Model 
         {
-            //PRINT2B1("writing performance metrics OP MODEL")
+
+            dvector weightsMALE = ptrMDS->ptrBio->wAtZ_xmz(MALE, MATURE); //male weight matrix
+            dvector weightsFEM = ptrMDS->ptrBio->wAtZ_xmz(FEMALE, MATURE);//female weight matrix
+            
+            PRINT2B2("Male weights", weightsMALE)
+            PRINT2B2("Female weights", weightsFEM)
+
+            dvector abundELM(20,32);
+            abundELM.initialize();
+            double ELMB = 0; // exploitable legal male biomass
+            dvector MMA(1,32);
+            MMA.initialize();
+            dvector MFA(1,32);
+            MFA.initialize();
+            double MMB=0; // Mature Male biomass 
+            double MFB=0; // Mature Female biomass 
+
+            //look over shell condition 1 and 2 (new and old) 
+            for (int s = 1; s<=2; s++){
+                //for(int z=1;z<=nZBs;z++){
+                    abundELM = value(prj_n_xmsz(MALE, MATURE, s)(20,32));
+                    MMA +=value(prj_n_xmsz( MALE, MATURE, s));
+                    MFA +=value(prj_n_xmsz(FEMALE, MATURE, s));
+                    
+                   //}//z = number of size bins
+                }//s = shell condition
+
+            //Abundance*weight for Exploitable Legal Male Biomass
+            for(int i = abundELM.indexmin(); i<=abundELM.indexmax(); ++i){ // check this indexing format     
+                ELMB += abundELM[i]*weightsMALE[i];
+            }
+            //Abundance*weight for Mature Male Biomass
+             for(int i = MMA.indexmin(); i<=MMA.indexmax(); ++i){ // check this indexing format     
+                MMB += MMA[i]*weightsMALE[i];
+            }
+            //Abundance*weight for Mature Female Biomass
+            for(int i = MFA.indexmin(); i<=MFA.indexmax(); ++i){ // check this indexing format     
+                MFB += MFA[i]*weightsFEM[i];
+            }
+
+            //testing
+            PRINT2B2("MMA", MMA)
+            PRINT2B2("MFA", MFA)
+            PRINT2B2("ELMA", abundELM)
+
+            PRINT2B1("writing performance metrics OP MODEL")
 
             cout<<"#---writing performance metrics OP MODEL "<<ptrMC->mxYr+1<<endl;
             adstring perfMetricsOPMod = "perfMetricsOPMod_"+str(mxYr+1)+".txt"; // Add perfMet somewhere earlier in function?
@@ -8391,16 +9527,24 @@ FUNCTION finishOpModMode
             os.precision(6); //number of decimal places in file
 
             os<<"#--Performance Metrics for Operating Model--"<<endl;
-            os<<"perfMetricsOPMod.final=list("<<endl;                  //Check line 
-            os<<"TAC="; calcTAC(doTAC, value(ptrOFLResults->OFL)); os<<cc<<endl;
-            os<<"OFL="; ptrOFLResults->OFL; os<<cc<<endl; // OFL
-            os<<"MMB="; prj_spB_x(MALE); os<<cc<<endl; //
-            os<<"MFB="; prj_spB_x(FEMALE); os<<cc<<endl; // 
+            os<<"perfMetricsOPMod.final=list("<<endl; 
+            os<<"TACset=";os<<calcTAC_OpMod(doTAC, value(ptrOFLResults->OFL));os<<cc<<endl;
+            PRINT2B2("TAC = ", repTAC_OpMod(doTAC, value(ptrOFLResults->OFL)))
+            PRINT2B2("TAC input = ", doTAC)
+            PRINT2B2("OFL = ", ptrOFLResults->OFL)
+            
+            os<<"TAC=";os<<repTAC_OpMod(doTAC, value(ptrOFLResults->OFL)); os<<cc<<endl; // showing 0 value
+            os<<"OFL=";os<<ptrOFLResults->OFL; os<<cc<<endl; // OFL
+            os<<"MMB=";os<<MMB; os<<cc<<endl; // Mature Male Biomass 
+            os<<"MFB=";os<<MFB; os<<cc<<endl; // Mature Female Biomass 
+            os<<"ELMB=";os<<ELMB; os<<cc<<endl; // Mature Female Biomass
+            os<<"AveRec=";wts::writeToR(os,mean(ptrOMI->R_y(1981,mxYr))*ptrOMI->R_x);os<<cc<<endl;
+            PRINT2B2("aveRec=", mean(ptrOMI->R_y(1981,mxYr))*ptrOMI->R_x)
             os<<"DISCARDS="; wts::writeToR(os,wts::value(prj_dmN_fxmsz),fDms,xDms,mDms,sDms,zbDms); os<<cc<<endl;
             os<<"CATCH="; wts::writeToR(os,wts::value(prj_rmN_fxmsz),fDms,xDms,mDms,sDms,zbDms); os<<endl;
             os<<")"<<endl;
             os<<"#--Finished performance metrics OP MODEL FINAL_PHASE--"<<endl;
-            os<<")"<<endl;
+            //os<<")"<<endl;
             os.close();
            
 
@@ -8561,33 +9705,74 @@ FINAL_SECTION
             ofs.close();
         }
 
-        // WRITE OFstream for performance metrics for ESTIMATION MODEL 
+        // WRITE OFstream for TAC,OFL, biomass performance metrics for ESTIMATION MODEL 
             
         {
+         // IDENTIFY MMB, MFB, and ELMB for Per metrics 
+           
+            dvector weightsMALE = ptrMDS->ptrBio->wAtZ_xmz(MALE, MATURE); //male weight matrix
+            dvector weightsFEM = ptrMDS->ptrBio->wAtZ_xmz(FEMALE, MATURE);//female weight matrix 
+            dvector abundELM(20,32);
+            abundELM.initialize();
+            double ELMB = 0; // exploitable legal male biomass
+            dvector MMA(1,32);
+            MMA.initialize();
+            dvector MFA(1,32);
+            MFA.initialize();
+            double MMB=0; // Mature Male biomass 
+            double MFB=0; // Mature Female biomass 
+
+            //look over shell condition 1 and 2 (new and old) 
+            for (int s = 1; s<=2; s++){
+                //for(int z=1;z<=nZBs;z++){
+                    abundELM += value(n_yxmsz(mxYr, MALE, MATURE, s)(20,32));
+                    MMA +=value(n_yxmsz(mxYr, MALE, MATURE, s));
+                    MFA +=value(n_yxmsz(mxYr, FEMALE, MATURE, s));
+                    
+                   //}//z
+                }//s
+            PRINT2B2("ELMA",abundELM)
+            PRINT2B2("MMA", MMA)
+            PRINT2B2("MFA", MFA)
+            //Abundance*weight for Exploitable Legal Male Biomass
+            for(int i = abundELM.indexmin(); i<=abundELM.indexmax(); ++i){ // check this indexing format     
+                ELMB += abundELM[i]*weightsMALE[i];
+            }
+            //Abundance*weight for Mature Male Biomass
+             for(int i = MMA.indexmin(); i<=MMA.indexmax(); ++i){ // check this indexing format     
+                MMB += MMA[i]*weightsMALE[i];
+            }
+            //Abundance*weight for Mature Female Biomass
+            for(int i = MFA.indexmin(); i<=MFA.indexmax(); ++i){ // check this indexing format     
+                MFB += MFA[i]*weightsFEM[i];
+            }
+
             PRINT2B1("writing performance metrics EST MODEL") //EDIT
             
             adstring perfMetricsEstMod = "perfMetricsEstMod_"+str(mxYr+1)+".txt"; // Add perfMet somewhere earlier in function?
 
-            ofstream os; os.open(perfMetricsEstMod, ios::app);       // ::trunc or app? Eventually appended but FIX IT FIRST
-            os<<"#--Performance Metrics for Estimation Model--"<<endl;
+            ofstream os; os.open(perfMetricsEstMod, ios::trunc);       // ::trunc or app? Eventually appended but FIX IT FIRST
+            os<<"#--Performance Metrics for Estimation Model--1--"<<endl;
             os<<"perfMetricsEstMod.final=list("<<endl;                  //Check line 
-            os<<"TAC="; os<<calcTAC(doTAC, value(ptrOFLResults->OFL)); os<<","<<endl;
-
-            //os<<"OFL="; calcOFL(mxYr+1,1,os); os<<cc<<endl; // OFL
-            os<<"OFL="; os<<value(ptrOFLResults->OFL); os<<cc<<endl; // OFL
-
-            os<<"MMB="; os<<spB_yx(mxYr, MALE); os<<cc<<endl; //
-            os<<"MFB="; os<<spB_yx(mxYr, FEMALE); os<<cc<<endl; // 
+            os<<"TACset=";os<<calcTAC(doTAC,value(ptrOFLResults->OFL));os<<cc<<endl;
+            os<<"TAC=";os<<repTAC(doTAC,value(ptrOFLResults->OFL));os<<cc<<endl;
+            os<<"OFL=";os<<value(ptrOFLResults->OFL);os<<cc<<endl; // OFL
+            os<<"MMB="; os<<MMB; os<<cc<<endl; //
+            os<<"MFB="; os<<MFB; os<<cc<<endl; // 
+            os<<"ELMB=";os<<ELMB;os<<cc<<endl;
+            //os<<"AveRec="; os<<mean(R_y(1981,mxYr))*R_yx(mxYr);os<<cc<<endl;
+            os<<"AveRec_test="; wts::writeToR(os,value(mean(R_y(1981,mxYr))*R_yx(mxYr)));os<<cc<<endl;
+            PRINT2B2("aveRec=", mean(R_y(1981,mxYr))*R_yx(mxYr))
             os<<"DISCARDS="; wts::writeToR(os,wts::value(dmN_fyxmsz),fDms,yDms,xDms,mDms,sDms,zbDms); os<<cc<<endl;
             os<<"CATCH="; wts::writeToR(os,wts::value(rmN_fyxmsz),fDms,yDms,xDms,mDms,sDms,zbDms); os<<endl;
             os<<")"<<endl;
-            os<<"#--Finished performance metrics EST MODEL FINAL_PHASE--"<<endl;
-            os<<")"<<endl;
+            os<<"#--Finished TAC,OFL, biomass performance metrics EST MODEL FINAL_PHASE--"<<endl;
+            //os<<")"<<endl;
             os.close();
            
-            PRINT2B1("finished writing performance metrics EST MODEL")
+            PRINT2B1("finished writing TAC,OFL, biomass, performance metrics EST MODEL")
         }
-                
+        
     } else if (mseOpModMode){
         finishOpModMode();
     }//mseOpModMode

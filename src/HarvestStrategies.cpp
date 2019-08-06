@@ -73,6 +73,59 @@ double HarvestStrategies::HCR2_MaleRamp(double MMB, double aveMMB, int rampID){
 }
 
 /**
+ HCR 22. Male only rule with Survey Estimated Biomass. Mid Ramp. 
+ * 
+ * @param MMB Mature Male Biomass in millions of lbs for the year SURVEY ESTIMATE
+ * @param aveMMB constant, MMB average from 1982-2016
+ 
+ */
+double HarvestStrategies::HCR22_MaleRamp_SurvEst(double MMB, double aveMMB){
+    //Define look up table for ramps
+    double slope = (10.0/75.0);
+    double intercept = 0.01675;
+    
+    double maleRatio = MMB/aveMMB;
+    double xp = 0;
+    if (maleRatio < 0.25){
+        return 0;
+    } else if (maleRatio >= 1.0){
+        maleRatio = 1;
+    }
+    xp = maleRatio*slope+intercept;
+    
+    double TAC = MMB*xp;
+    
+    return TAC;
+}
+
+/**
+ HCR 23. Male only rule with Model Survey Estimated Biomass. Mid Ramp. 
+ * 
+ * @param MMB Mature Male Biomass in millions of lbs for the year MODEL SURVEY ESTIMATE
+ * @param aveMMB constant, MMB average from 1982-2016
+ 
+ */
+
+double HarvestStrategies::HCR23_MaleRamp_ModSurvEst(double MMB, double aveMMB){
+    //Define look up table for ramps
+    double slope = (10.0/75.0);
+    double intercept = 0.01675;
+    
+    double maleRatio = MMB/aveMMB;
+    double xp = 0;
+    if (maleRatio < 0.25){
+        return 0;
+    } else if (maleRatio >= 1.0){
+        maleRatio = 1;
+    }
+    xp = maleRatio*slope+intercept;
+    
+    double TAC = MMB*xp;
+    
+    return TAC;
+}
+
+/**
  * HCR 3. Takes OFL from operating model, uses pre-determined buffer.
  * 
  * @param OFL from the model

@@ -100,7 +100,7 @@ class Equilibrium_Calculator {
  */
 class Tier_Calculator {
     public:
-        static const int maxIts = 5;//max iterations when calculating Fmsy
+        static const int maxIts = 10;//max iterations when calculating Fmsy
         Equilibrium_Calculator* pEC;//pointer to Equilibrium_Calculator object for males
         
     public:
