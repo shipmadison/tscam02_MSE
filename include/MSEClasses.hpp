@@ -41,6 +41,7 @@ public:
     d5_array sel_fxmsz;
     d5_array q_vxmsz;
     d4_array n_xmsz;
+    dmatrix spB_yx; // ADDED for AVERAGING 
 public:
     MSE_OpModInfo(ModelConfiguration* ptrMC);
     ~MSE_OpModInfo(){}

@@ -37,6 +37,7 @@ void MSE_OpModInfo::read(cifstream& is){
     is>>sel_fxmsz;
     is>>q_vxmsz;
     is>>n_xmsz;
+    is>>spB_yx;
 }
 
 void MSE_OpModInfo::allocate(){
@@ -53,4 +54,5 @@ void MSE_OpModInfo::allocate(){
     sel_fxmsz.allocate(1,nFsh,1,nSXs,1,nMSs,1,nSCs,1,nZBs);
     q_vxmsz.allocate(1,nSrv,1,nSXs,1,nMSs,1,nSCs,1,nZBs);
     n_xmsz.allocate(1,nSXs,1,nMSs,1,nSCs,1,nZBs);
+    spB_yx.allocate(mnYr,mxYr-1,1,nSXs);
 }
