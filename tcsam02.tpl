@@ -9921,7 +9921,7 @@ FUNCTION finishOpModMode
             os<<"IFDB="; os<<IFDB; os<<cc<<endl;
             os<<"ELMD="; os<<ELMD; os<<cc<<endl;
             os<<"MMDB="; os<<MMDB; os<<cc<<endl;
-            os<<"IMDB="; os<<IMDB; os<<cc<<endl;
+            os<<"IMDB="; os<<IMDB; os<<endl;
             
             //os<<"DISCARDS="; wts::writeToR(os,wts::value(prj_dmN_fxmsz),fDms,xDms,mDms,sDms,zbDms); os<<cc<<endl;
             //os<<"CATCH="; wts::writeToR(os,wts::value(prj_rmN_fxmsz),fDms,xDms,mDms,sDms,zbDms); os<<endl;
@@ -10323,7 +10323,7 @@ FINAL_SECTION
             os<<"IFDB="; os<<IFDB; os<<cc<<endl;
             os<<"ELMD="; os<<ELMD; os<<cc<<endl;
             os<<"MMDB="; os<<MMDB; os<<cc<<endl;
-            os<<"IMDB="; os<<IMDB; os<<cc<<endl;
+            os<<"IMDB="; os<<IMDB; os<<endl;
             
             
             //os<<"DISCARDS="; wts::writeToR(os,wts::value(dmN_fyxmsz),fDms,yDms,xDms,mDms,sDms,zbDms); os<<cc<<endl;

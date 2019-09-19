@@ -474,13 +474,15 @@ void ModelOptions::read(cifstream & is) {
          // ADD OTHER HCRS 
         } else if (str=="HCR22"){    
            cout<<tb<<tb<<"#HCR22"<<endl; 
+           cout<<"#--options for "<<str<<endl;
            is>>HCR_avgMinYr;
            is>>HCR_avgMaxYr;
            cout<<HCR_avgMinYr<<tb<<HCR_avgMaxYr<<tb<<"#min, max years for averaging"<<endl;
            if (HCR_avgMaxYr==-1) HCR_avgMaxYr = ptrMC->mxYr;
         
-        } else if (str=="HCR23"){    
+        } else if (str=="HCR23"){  
            cout<<tb<<tb<<"#HCR23"<<endl; 
+           cout<<"#--options for "<<str<<endl;
            is>>HCR_avgMinYr;
            is>>HCR_avgMaxYr;
            cout<<HCR_avgMinYr<<tb<<HCR_avgMaxYr<<tb<<"#min, max years for averaging"<<endl;
