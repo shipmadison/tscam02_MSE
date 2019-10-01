@@ -9899,6 +9899,8 @@ FUNCTION finishOpModMode
             
             os<<"TAC=";os<<repTAC_OpMod(doTAC, value(ptrOFLResults->OFL)); os<<cc<<endl; // showing 0 value
             os<<"OFL=";os<<ptrOFLResults->OFL; os<<cc<<endl; // OFL
+            os<<"B0=";os<<value(ptrOFLResults->B0);os<<cc<<endl; // B0
+            os<<"Bmsy=";os<<value(ptrOFLResults->Bmsy);os<<cc<<endl; // Bmsy
             os<<"MMB=";os<<MMB; os<<cc<<endl; // Mature Male Biomass 
             os<<"MFB=";os<<MFB; os<<cc<<endl; // Mature Female Biomass 
             os<<"ELMB=";os<<ELMB; os<<cc<<endl; // 5"< males 
@@ -9908,6 +9910,7 @@ FUNCTION finishOpModMode
             
             // Recruitment (1 value)
             os<<"RecAve=";os<<RecAve; os<<cc<<endl;
+            os<<"Rec=";os<<ptrOMI->R_y(mxYr);os<<cc<<endl;
 
             // Catch Biomass (By sex and maturity)
             os<<"MFCB="; os<<MFCB; os<<cc<<endl;
@@ -10303,6 +10306,8 @@ FINAL_SECTION
             os<<"TACset=";os<<calcTAC(doTAC,value(ptrOFLResults->OFL));os<<cc<<endl;
             os<<"TAC=";os<<repTAC(doTAC,value(ptrOFLResults->OFL));os<<cc<<endl;
             os<<"OFL=";os<<value(ptrOFLResults->OFL);os<<cc<<endl; // OFL
+            os<<"B0=";os<<value(ptrOFLResults->B0);os<<cc<<endl; // B0
+            os<<"Bmsy=";os<<value(ptrOFLResults->Bmsy);os<<cc<<endl; // Bmsy
             os<<"MMB="; os<<MMB; os<<cc<<endl; //
             os<<"MFB="; os<<MFB; os<<cc<<endl; // 
             os<<"ELMB=";os<<ELMB;os<<cc<<endl;
@@ -10310,7 +10315,7 @@ FINAL_SECTION
             os<<"AveRec=";os<<RecAve;os<<cc<<endl;
             //os<<"AveRec_test="; wts::writeToR(os,value(mean(R_y(1981,mxYr))*R_yx(mxYr)));os<<cc<<endl;
             //PRINT2B2("aveRec=", mean(R_y(1981,mxYr))*R_yx(mxYr))
-            
+            os<<"Rec=";os<<R_y(mxYr);os<<cc<<endl;
             // Catch Biomass (By sex and maturity)
             os<<"MFCB="; os<<MFCB; os<<cc<<endl;
             os<<"IFCB="; os<<IFCB; os<<cc<<endl;
