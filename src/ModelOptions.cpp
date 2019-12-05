@@ -501,6 +501,27 @@ void ModelOptions::read(cifstream & is) {
            is>>HCR_avgMaxYr;
            cout<<HCR_avgMinYr<<tb<<HCR_avgMaxYr<<tb<<"#min, max years for averaging"<<endl;
            if (HCR_avgMaxYr==-1) HCR_avgMaxYr = ptrMC->mxYr;
+           
+        }else if (str=="HCR41"){
+            cout<<"#--options for "<<str<<endl;
+           is>>HCR_avgMinYr;
+           is>>HCR_avgMaxYr;
+           cout<<HCR_avgMinYr<<tb<<HCR_avgMaxYr<<tb<<"#min, max years for averaging"<<endl;
+           if (HCR_avgMaxYr==-1) HCR_avgMaxYr = ptrMC->mxYr;
+           
+        }else if (str=="HCR42"){
+            cout<<"#--options for "<<str<<endl;
+           is>>HCR_avgMinYr;
+           is>>HCR_avgMaxYr;
+           cout<<HCR_avgMinYr<<tb<<HCR_avgMaxYr<<tb<<"#min, max years for averaging"<<endl;
+           if (HCR_avgMaxYr==-1) HCR_avgMaxYr = ptrMC->mxYr;
+           
+        }else if (str=="HCR43"){
+            cout<<"#--options for "<<str<<endl;
+           is>>HCR_avgMinYr;
+           is>>HCR_avgMaxYr;
+           cout<<HCR_avgMinYr<<tb<<HCR_avgMaxYr<<tb<<"#min, max years for averaging"<<endl;
+           if (HCR_avgMaxYr==-1) HCR_avgMaxYr = ptrMC->mxYr;
         } else if (str=="HCR5"){    
            cout<<"#--options for "<<str<<endl;
           

@@ -84,7 +84,7 @@ class HarvestStrategies {
         double static HCR3_ABC(double OFL, double buffer);
         
         /**
-         * HCR 4. Scaled with females--> moving. 
+         * HCR 4. Scaled with females--> moving from 5% to 20% exploitation. 
          * 
          * @param MFB
          * @param aveMFB
@@ -93,6 +93,39 @@ class HarvestStrategies {
          * @return 
          */
         double static HCR4_FemaleDimmer(double MFB, double aveMFB, double MMB, double aveMMB);
+        
+        /**
+         * HCR 41. Scaled with females--> moving from 10% to 20% exploitation. 
+         * 
+         * @param MFB
+         * @param aveMFB
+         * @param MMB
+         * @param aveMMB
+         * @return 
+         */
+        double static HCR41_FemaleDimmer(double MFB, double aveMFB, double MMB, double aveMMB);
+        
+        /**
+         * HCR 42. Scaled with females--> moving from 10% to 22.5% exploitation. 
+         * 
+         * @param MFB
+         * @param aveMFB
+         * @param MMB
+         * @param aveMMB
+         * @return 
+         */
+        double static HCR42_FemaleDimmer(double MFB, double aveMFB, double MMB, double aveMMB);
+        
+        /**
+         * HCR 43 --> Written in for if statement for Max TAC at 30% ELM
+         * 
+         * @param MFB
+         * @param aveMFB
+         * @param MMB
+         * @param aveMMB
+         * @return 
+         */
+        double static HCR43_FemaleDimmer(double MFB, double aveMFB, double MMB, double aveMMB);
         
         /**
          * HCR 5. Scaled with females --> blocks.

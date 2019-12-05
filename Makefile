@@ -48,6 +48,7 @@
 PLATFORM=WIN
 ADMB_HOME_WIN=C:/ADMB
 ADMB_HOME_MAC=/Users/WilliamStockhausen/Programs/admb_v12/build/dist
+ADMB_HOME_LINUX=/home/ubuntu/admb
 ADMB_HOME=${ADMB_HOME_${PLATFORM}}
 TPL=tcsam02
 MKDIR=mkdir

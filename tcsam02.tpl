@@ -8405,7 +8405,7 @@ FUNCTION int calcTAC(int hcr, double OFL)  //int calcOption
         info = "#--HCR3: buffer = "+str(buffer)+cc+"OFL = "+str(OFL)+cc+"TAC = "+str(TAC);
     }
 
-// Harvest Control Rule 4--Female Dimmer
+// Harvest Control Rule 4--Female Dimmer 5%-20% exploitation
     if (hcr==4){                             
         
     // Define Biomass 
@@ -8421,6 +8421,61 @@ FUNCTION int calcTAC(int hcr, double OFL)  //int calcOption
         double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
         TAC = HarvestStrategies::HCR4_FemaleDimmer(MFB, aveMFB, MMB, aveMMB);
          info = "#--HCR4: MMB = "+str(MMB)+cc+"MFB = "+str(MFB)+cc+"aveMMB = "+str(aveMMB)+cc+"aveMFB = "+str(aveMFB);
+    }
+
+// Harvest Control Rule 41--Female Dimmer 10%-20% exploitation
+    if (hcr==41){                             
+        
+    // Define Biomass 
+
+       dmatrix vspB_yx = value(spB_yx);
+        double MMB = vspB_yx(mxYr,  MALE);
+        double MFB = vspB_yx(mxYr,FEMALE);
+
+   // Define Average Biomass
+        ivector perm(1,2); perm[1]=2;perm[2]=1;
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        TAC = HarvestStrategies::HCR4_FemaleDimmer(MFB, aveMFB, MMB, aveMMB);
+         info = "#--HCR41: MMB = "+str(MMB)+cc+"MFB = "+str(MFB)+cc+"aveMMB = "+str(aveMMB)+cc+"aveMFB = "+str(aveMFB);
+    }
+
+
+// Harvest Control Rule 42--Female Dimmer 10%-22.5% exploitation capped at 50% ELM 
+    if (hcr==42){                             
+        
+    // Define Biomass 
+
+       dmatrix vspB_yx = value(spB_yx);
+        double MMB = vspB_yx(mxYr,  MALE);
+        double MFB = vspB_yx(mxYr,FEMALE);
+
+   // Define Average Biomass
+        ivector perm(1,2); perm[1]=2;perm[2]=1;
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        TAC = HarvestStrategies::HCR4_FemaleDimmer(MFB, aveMFB, MMB, aveMMB);
+         info = "#--HCR42: MMB = "+str(MMB)+cc+"MFB = "+str(MFB)+cc+"aveMMB = "+str(aveMMB)+cc+"aveMFB = "+str(aveMFB);
+    }
+
+// Harvest Control Rule 43--Female Dimmer 10%-22.5% exploitation capped at 30% ELM
+    if (hcr==43){                             
+        
+    // Define Biomass 
+
+       dmatrix vspB_yx = value(spB_yx);
+        double MMB = vspB_yx(mxYr,  MALE);
+        double MFB = vspB_yx(mxYr,FEMALE);
+
+   // Define Average Biomass
+        ivector perm(1,2); perm[1]=2;perm[2]=1;
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        TAC = HarvestStrategies::HCR4_FemaleDimmer(MFB, aveMFB, MMB, aveMMB);
+         info = "#--HCR43: MMB = "+str(MMB)+cc+"MFB = "+str(MFB)+cc+"aveMMB = "+str(aveMMB)+cc+"aveMFB = "+str(aveMFB);
     }
 
 // Harvest Control Rule 5--FemaleBlocks
@@ -8486,12 +8541,12 @@ FUNCTION int calcTAC(int hcr, double OFL)  //int calcOption
         dmatrix w_mz       = value(ptrMDS->ptrBio->wAtZ_xmz(MALE));   //weight at size
         dvector cpB_z(20,32); cpB_z.initialize();
         for (int m=1;m<=nMSs;m++){                       //loops over maturity state
-            for (int s=1;s<=nMSs;s++){                   //loops over shell condition
-                cpB_z += elem_prod(selF_msz(m,s)(20,32),
-                                   elem_prod(exp(-M_msz(m,s)(20,32)),
-                                             elem_prod(n_msz(m,s)(20,32),w_mz(m)(20,32))
-                                            )
-                                                )*(1-exp(-Fmsy));       
+            for (int s=1;s<=nSCs;s++){                   //loops over shell condition
+                cpB_z += elem_prod(
+                    elem_prod(
+                      elem_prod(n_msz(m,s)(20,32),  exp(-0.625*M_msz(m,s)(20,32))),
+                      (1-exp(-Fmsy* selF_msz(m,s)(20,32)))),  
+                        w_mz(m)(20,32));       
             }
         }
         double CWmsy = sum(cpB_z);
@@ -8555,10 +8610,15 @@ FUNCTION int calcTAC(int hcr, double OFL)  //int calcOption
         PRINT2B2("#ELMB=", ELMB) 
         
         double maxTAC = 0;
+        double maxTAC30 = 0;
         maxTAC = 0.5*ELMB;
         PRINT2B2("#maxTAC=", maxTAC) 
-
-    if (TAC>maxTAC) TAC=maxTAC; // SET MAX TAC
+        maxTAC30 = 0.3*ELMB; // SET MAX TAC at 30% for Third Dimmer iteration hcr 43
+        
+    if(hcr==3){ TAC = TAC; //uncap TAC
+    }else if(hcr==43){ if (TAC>maxTAC30) TAC=maxTAC30; // SET MAX TAC at 30% ELM for HCR 43
+        PRINT2B2("#maxTAC30=", maxTAC30)
+    }else{if (TAC>maxTAC) TAC=maxTAC;} // SET MAX TAC
 
    
     if (TAC>0.0) closed=0;  // If there is a TAC the fishery is not closed 
@@ -8711,7 +8771,7 @@ FUNCTION double repTAC(int hcr, double OFL)  //int calcOption
 
         }
 
-// Harvest Control Rule 4--Female Dimmer
+// Harvest Control Rule 4--Female Dimmer 5%-20% exploitation
     if (hcr==4){                             
         
        dmatrix vspB_yx = value(spB_yx);
@@ -8723,6 +8783,61 @@ FUNCTION double repTAC(int hcr, double OFL)  //int calcOption
         double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
         TAC = HarvestStrategies::HCR4_FemaleDimmer(MFB, aveMFB, MMB, aveMMB);
         info ="#--HCR4: MFB = "+str(MFB)+cc+"aveMFB= "+str(aveMFB)+cc+"MMB ="+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"TAC = "+str(TAC); 
+    }
+
+// Harvest Control Rule 41--Female Dimmer 10%-20% exploitation
+    if (hcr==41){                             
+        
+    // Define Biomass 
+
+       dmatrix vspB_yx = value(spB_yx);
+        double MMB = vspB_yx(mxYr,  MALE);
+        double MFB = vspB_yx(mxYr,FEMALE);
+
+   // Define Average Biomass
+        ivector perm(1,2); perm[1]=2;perm[2]=1;
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        TAC = HarvestStrategies::HCR4_FemaleDimmer(MFB, aveMFB, MMB, aveMMB);
+         info = "#--HCR41: MMB = "+str(MMB)+cc+"MFB = "+str(MFB)+cc+"aveMMB = "+str(aveMMB)+cc+"aveMFB = "+str(aveMFB);
+    }
+
+
+// Harvest Control Rule 42--Female Dimmer 10%-22.5% exploitation capped at 50% ELM
+    if (hcr==42){                             
+        
+    // Define Biomass 
+
+       dmatrix vspB_yx = value(spB_yx);
+        double MMB = vspB_yx(mxYr,  MALE);
+        double MFB = vspB_yx(mxYr,FEMALE);
+
+   // Define Average Biomass
+        ivector perm(1,2); perm[1]=2;perm[2]=1;
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        TAC = HarvestStrategies::HCR4_FemaleDimmer(MFB, aveMFB, MMB, aveMMB);
+         info = "#--HCR42: MMB = "+str(MMB)+cc+"MFB = "+str(MFB)+cc+"aveMMB = "+str(aveMMB)+cc+"aveMFB = "+str(aveMFB);
+    }
+
+// Harvest Control Rule 43--Female Dimmer 10%-22.5% exploitation Capped at 30%ELM
+    if (hcr==42){                             
+        
+    // Define Biomass 
+
+       dmatrix vspB_yx = value(spB_yx);
+        double MMB = vspB_yx(mxYr,  MALE);
+        double MFB = vspB_yx(mxYr,FEMALE);
+
+   // Define Average Biomass
+        ivector perm(1,2); perm[1]=2;perm[2]=1;
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        TAC = HarvestStrategies::HCR4_FemaleDimmer(MFB, aveMFB, MMB, aveMMB);
+         info = "#--HCR43: MMB = "+str(MMB)+cc+"MFB = "+str(MFB)+cc+"aveMMB = "+str(aveMMB)+cc+"aveMFB = "+str(aveMFB);
     }
 
 // Harvest Control Rule 5--FemaleBlocks
@@ -8783,15 +8898,23 @@ FUNCTION double repTAC(int hcr, double OFL)  //int calcOption
         dmatrix w_mz       = value(ptrMDS->ptrBio->wAtZ_xmz(MALE));   //weight at size
         dvector cpB_z(20,32); cpB_z.initialize();
         for (int m=1;m<=nMSs;m++){                       //loops over maturity state
-            for (int s=1;s<=nMSs;s++){                   //loops over shell condition
-                cpB_z += elem_prod(selF_msz(m,s)(20,32),
-                                   elem_prod(exp(-M_msz(m,s)(20,32)),
-                                             elem_prod(n_msz(m,s)(20,32),w_mz(m)(20,32))
-                                            )
-                                                )*(1-exp(-Fmsy));       
-            }
+            for (int s=1;s<=nSCs;s++){                   //loops over shell condition
+                cpB_z += elem_prod(
+                    elem_prod(
+                      elem_prod(n_msz(m,s)(20,32),  exp(-0.625*M_msz(m,s)(20,32))),
+                      (1-exp(-Fmsy* selF_msz(m,s)(20,32)))),  
+                        w_mz(m)(20,32)); 
+                                               
+                                                PRINT2B2("#CWmsy_check1= ", cpB_z)
+                                                PRINT2B2("#selF_check1= ", selF_msz)
+                                                PRINT2B2("#M_check1= ", M_msz)
+                                                PRINT2B2("#Num_check1=", n_msz)
+                                                PRINT2B2("#weight_mz=", w_mz)
+                                                PRINT2B2("#Fmsy=", Fmsy)
+            }                   
         }
         double CWmsy = sum(cpB_z);
+        PRINT2B2("#CWmsy_check2= ", CWmsy)
         //now calculate TAC using the HCR
             
         dmatrix vspB_yx = value(spB_yx);
@@ -8808,6 +8931,7 @@ FUNCTION double repTAC(int hcr, double OFL)  //int calcOption
         if(rmN_fyxmsz(1, mxYr, MALE, MATURE, 1, (20,32)) == 0) TAC = 0.5*TAC; // Half TAC rule VERIFY THIS DOES WHAT IT'S SUPPOSED TO           
         info = "#--HCR7: MMB = "+str(MMB)+cc+"MFB = "+str(MFB)+cc+"aveMMB = "+str(aveMMB)+cc+"aveMFB = "+str(aveMFB)+cc+"CWmsy = "+str(CWmsy);
     }
+
 
         // CAP TAC at 50% of ELMB
         dvector weights = ptrMDS->ptrBio->wAtZ_xmz(MALE, MATURE);
@@ -8846,10 +8970,15 @@ FUNCTION double repTAC(int hcr, double OFL)  //int calcOption
         PRINT2B2("#ELMB=", ELMB) 
         
         double maxTAC = 0;
+        double maxTAC30 = 0;
         maxTAC = 0.5*ELMB;
         PRINT2B2("#maxTAC=", maxTAC) 
-
-    if (TAC>maxTAC) TAC=maxTAC; // SET MAX TAC
+        maxTAC30 = 0.3*ELMB; // SET MAX TAC at 30% for Third Dimmer iteration hcr 43
+        
+    if(hcr==3){ TAC = TAC; //uncap TAC
+    }else if(hcr==43){ if (TAC>maxTAC30) TAC=maxTAC30; // SET MAX TAC at 30% ELM for HCR 43
+        PRINT2B2("#maxTAC30=", maxTAC30)
+    }else{if (TAC>maxTAC) TAC=maxTAC;} // SET MAX TAC
 
  
     //--save TAC and OFL to file for OpMod to read
@@ -8918,7 +9047,13 @@ FUNCTION int calcTAC_OpMod(int hcr, double OFL)  //int calcOption
         
         //Define Average MMB
         dmatrix vspB_yx = value(ptrOMI->spB_yx);
-        PRINT2B2("opmod_spB =", vspB_yx) 
+
+        //PRINT2B2("opmod_spB =", vspB_yx) 
+        //PRINT2B2("opmod_spBMale1 =", vspB_yx(ptrMOs->HCR_avgMinYr, MALE)) 
+        //PRINT2B2("opmod_spBMale2 =", vspB_yx(ptrMOs->HCR_avgMaxYr, MALE)) 
+        //PRINT2B2("opmod_spBFemale1 =", vspB_yx(ptrMOs->HCR_avgMinYr,FEMALE)) 
+        //PRINT2B2("opmod_spBFemale2 =", vspB_yx(ptrMOs->HCR_avgMaxYr,FEMALE)) 
+
         ivector perm(1,2); perm[1]=2;perm[2]=1; //permutates year and sex in matrix structure
         dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
         double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
@@ -9013,7 +9148,7 @@ FUNCTION int calcTAC_OpMod(int hcr, double OFL)  //int calcOption
         info = "#--HCR3: buffer = "+str(buffer)+cc+"OFL = "+str(OFL)+cc+"TAC = "+str(TAC);
     }
 
-// Harvest Control Rule 4--Female Dimmer
+// Harvest Control Rule 4--Female Dimmer 5% to 20% exploitation
     if (hcr==4){                             
         
         // ID biomass for males and females for  OP MOD using prj_spB
@@ -9030,6 +9165,63 @@ FUNCTION int calcTAC_OpMod(int hcr, double OFL)  //int calcOption
         double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
         TAC = HarvestStrategies::HCR4_FemaleDimmer(MFB, aveMFB, MMB, aveMMB);
         info ="#--HCR4: MFB = "+str(MFB)+cc+"aveMFB= "+str(aveMFB)+cc+"MMB ="+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"TAC = "+str(TAC); 
+        }
+
+// Harvest Control Rule 41--Female Dimmer 10% to 20% exploitation 
+    if (hcr==41){                             
+        
+        // ID biomass for males and females for  OP MOD using prj_spB
+        dvector vspB_x = value(prj_spB_x);
+        double MMB = vspB_x(MALE);
+        double MFB = vspB_x(FEMALE);
+
+        // Averages for Male and Female Biomass 
+        dmatrix vspB_yx = value(ptrOMI->spB_yx);
+        PRINT2B2("opmod_spB =", vspB_yx) 
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //permutates year and sex in matrix structure
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        TAC = HarvestStrategies::HCR4_FemaleDimmer(MFB, aveMFB, MMB, aveMMB);
+        info ="#--HCR41: MFB = "+str(MFB)+cc+"aveMFB= "+str(aveMFB)+cc+"MMB ="+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"TAC = "+str(TAC); 
+        }
+
+// Harvest Control Rule 42--Female Dimmer 10% to 22.5% exploitation with cap at 50% ELM
+    if (hcr==42){                             
+        
+        // ID biomass for males and females for  OP MOD using prj_spB
+        dvector vspB_x = value(prj_spB_x);
+        double MMB = vspB_x(MALE);
+        double MFB = vspB_x(FEMALE);
+
+        // Averages for Male and Female Biomass 
+        dmatrix vspB_yx = value(ptrOMI->spB_yx);
+        PRINT2B2("opmod_spB =", vspB_yx) 
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //permutates year and sex in matrix structure
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        TAC = HarvestStrategies::HCR4_FemaleDimmer(MFB, aveMFB, MMB, aveMMB);
+        info ="#--HCR43: MFB = "+str(MFB)+cc+"aveMFB= "+str(aveMFB)+cc+"MMB ="+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"TAC = "+str(TAC); 
+        }
+
+// Harvest Control Rule 43--Female Dimmer 10% to 22.5% exploitation with 30% ELM Cap 
+    if (hcr==43){                             
+        
+        // ID biomass for males and females for  OP MOD using prj_spB
+        dvector vspB_x = value(prj_spB_x);
+        double MMB = vspB_x(MALE);
+        double MFB = vspB_x(FEMALE);
+
+        // Averages for Male and Female Biomass 
+        dmatrix vspB_yx = value(ptrOMI->spB_yx);
+        PRINT2B2("opmod_spB =", vspB_yx) 
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //permutates year and sex in matrix structure
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        TAC = HarvestStrategies::HCR4_FemaleDimmer(MFB, aveMFB, MMB, aveMMB);
+        info ="#--HCR43: MFB = "+str(MFB)+cc+"aveMFB= "+str(aveMFB)+cc+"MMB ="+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"TAC = "+str(TAC); 
         }
 
 // Harvest Control Rule 5--FemaleBlocks
@@ -9097,12 +9289,12 @@ FUNCTION int calcTAC_OpMod(int hcr, double OFL)  //int calcOption
         dmatrix w_mz       = value(ptrMDS->ptrBio->wAtZ_xmz(MALE));   //weight at size
         dvector cpB_z(20,32); cpB_z.initialize();
         for (int m=1;m<=nMSs;m++){                       //loops over maturity state
-            for (int s=1;s<=nMSs;s++){                   //loops over shell condition
-                cpB_z += elem_prod(selF_msz(m,s)(20,32),
-                                   elem_prod(exp(-M_msz(m,s)(20,32)),
-                                             elem_prod(n_msz(m,s)(20,32),w_mz(m)(20,32))
-                                            )
-                                                )*(1-exp(-Fmsy));       
+            for (int s=1;s<=nSCs;s++){                   //loops over shell condition
+                cpB_z += elem_prod(
+                    elem_prod(
+                      elem_prod(n_msz(m,s)(20,32),  exp(-0.625*M_msz(m,s)(20,32))),
+                      (1-exp(-Fmsy* selF_msz(m,s)(20,32)))),  
+                        w_mz(m)(20,32));        
             }
         }
         double CWmsy = sum(cpB_z);
@@ -9172,12 +9364,19 @@ FUNCTION int calcTAC_OpMod(int hcr, double OFL)  //int calcOption
        
         PRINT2B2("#ELMB=", ELMB) 
         
+       
+        
         double maxTAC = 0;
+        double maxTAC30 = 0;
         maxTAC = 0.5*ELMB;
         PRINT2B2("#maxTAC=", maxTAC) 
+        maxTAC30 = 0.3*ELMB; // SET MAX TAC at 30% for Third Dimmer iteration hcr 43
+        
+    if(hcr==3){ TAC = TAC; //uncap TAC
+    }else if(hcr==43){ if (TAC>maxTAC30) TAC=maxTAC30; // SET MAX TAC at 30% ELM for HCR 43
+        PRINT2B2("#maxTAC30=", maxTAC30)
+    }else{if (TAC>maxTAC) TAC=maxTAC;} // SET MAX TAC
 
-    if (TAC>maxTAC) TAC=maxTAC; // SET MAX TAC
-   
     if (TAC>0.0) closed=0;  // If there is a TAC the fishery is not closed 
 
     //--save TAC and OFL to file for OpMod to read
@@ -9331,7 +9530,7 @@ FUNCTION double repTAC_OpMod(int hcr, double OFL)  //int calcOption
 
        }
 
-// Harvest Control Rule 4--Female Dimmer
+// Harvest Control Rule 4--Female Dimmer -- 5% to 20% exploitation
     if (hcr==4){                             
         
         // ID biomass for males and females for  OP MOD using prj_spB
@@ -9352,6 +9551,63 @@ FUNCTION double repTAC_OpMod(int hcr, double OFL)  //int calcOption
         TAC = HarvestStrategies::HCR4_FemaleDimmer(MFB, aveMFB, MMB, aveMMB);
         info ="#--HCR4: MFB = "+str(MFB)+cc+"aveMFB= "+str(aveMFB)+cc+"MMB ="+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"TAC = "+str(TAC); 
           }
+
+// Harvest Control Rule 41--Female Dimmer 10% to 20% exploitation 
+    if (hcr==41){                             
+        
+        // ID biomass for males and females for  OP MOD using prj_spB
+        dvector vspB_x = value(prj_spB_x);
+        double MMB = vspB_x(MALE);
+        double MFB = vspB_x(FEMALE);
+
+        // Averages for Male and Female Biomass 
+        dmatrix vspB_yx = value(ptrOMI->spB_yx);
+        PRINT2B2("opmod_spB =", vspB_yx) 
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //permutates year and sex in matrix structure
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        TAC = HarvestStrategies::HCR4_FemaleDimmer(MFB, aveMFB, MMB, aveMMB);
+        info ="#--HCR41: MFB = "+str(MFB)+cc+"aveMFB= "+str(aveMFB)+cc+"MMB ="+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"TAC = "+str(TAC); 
+        }
+
+// Harvest Control Rule 42--Female Dimmer 10% to 22.5% exploitation 
+    if (hcr==42){                             
+        
+        // ID biomass for males and females for  OP MOD using prj_spB
+        dvector vspB_x = value(prj_spB_x);
+        double MMB = vspB_x(MALE);
+        double MFB = vspB_x(FEMALE);
+
+        // Averages for Male and Female Biomass 
+        dmatrix vspB_yx = value(ptrOMI->spB_yx);
+        PRINT2B2("opmod_spB =", vspB_yx) 
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //permutates year and sex in matrix structure
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        TAC = HarvestStrategies::HCR4_FemaleDimmer(MFB, aveMFB, MMB, aveMMB);
+        info ="#--HCR42: MFB = "+str(MFB)+cc+"aveMFB= "+str(aveMFB)+cc+"MMB ="+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"TAC = "+str(TAC); 
+        }
+
+// Harvest Control Rule 43--Female Dimmer 10% to 22.5% exploitation with 30% ELM Cap 
+    if (hcr==43){                             
+        
+        // ID biomass for males and females for  OP MOD using prj_spB
+        dvector vspB_x = value(prj_spB_x);
+        double MMB = vspB_x(MALE);
+        double MFB = vspB_x(FEMALE);
+
+        // Averages for Male and Female Biomass 
+        dmatrix vspB_yx = value(ptrOMI->spB_yx);
+        PRINT2B2("opmod_spB =", vspB_yx) 
+        ivector perm(1,2); perm[1]=2;perm[2]=1; //permutates year and sex in matrix structure
+        dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+        double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
+        TAC = HarvestStrategies::HCR4_FemaleDimmer(MFB, aveMFB, MMB, aveMMB);
+        info ="#--HCR43: MFB = "+str(MFB)+cc+"aveMFB= "+str(aveMFB)+cc+"MMB ="+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"TAC = "+str(TAC); 
+        }
 
 // Harvest Control Rule 5--FemaleBlocks
     if (hcr==5){      
@@ -9420,11 +9676,18 @@ FUNCTION double repTAC_OpMod(int hcr, double OFL)  //int calcOption
         dvector cpB_z(20,32); cpB_z.initialize();
         for (int m=1;m<=nMSs;m++){                       //loops over maturity state
             for (int s=1;s<=nMSs;s++){                   //loops over shell condition
-                cpB_z += elem_prod(selF_msz(m,s)(20,32),
-                                   elem_prod(exp(-M_msz(m,s)(20,32)),
-                                             elem_prod(n_msz(m,s)(20,32),w_mz(m)(20,32))
-                                            )
-                                                )*(1-exp(-Fmsy));       
+                cpB_z += elem_prod(
+                    elem_prod(
+                      elem_prod(n_msz(m,s)(20,32),  exp(-0.625*M_msz(m,s)(20,32))),
+                      (1-exp(-Fmsy* selF_msz(m,s)(20,32)))),  
+                        w_mz(m)(20,32));     
+                                                
+                                                PRINT2B2("#CWmsy_check1= ", cpB_z)
+                                                PRINT2B2("#selF_check1= ", selF_msz)
+                                                PRINT2B2("#M_check1= ", M_msz)
+                                                PRINT2B2("#Num_check1=", n_msz)
+                                                PRINT2B2("#weight_mz=", w_mz)
+                                                PRINT2B2("#Fmsy=", Fmsy)
             }
         }
         double CWmsy = sum(cpB_z);
@@ -9495,10 +9758,14 @@ FUNCTION double repTAC_OpMod(int hcr, double OFL)  //int calcOption
         PRINT2B2("#ELMB=", ELMB) 
         
         double maxTAC = 0;
+        double maxTAC30 = 0;
         maxTAC = 0.5*ELMB;
+        maxTAC30 = 0.3*ELMB; // SET MAX TAC at 30% for Third Dimmer iteration hcr 43
         PRINT2B2("#maxTAC=", maxTAC) 
 
-    if (TAC>maxTAC) TAC=maxTAC; // SET MAX TAC
+    if(hcr==3){ TAC = TAC; //uncap TAC
+    }else if(hcr==43){ if (TAC>maxTAC30) TAC=maxTAC30; // SET MAX TAC at 30% ELM for HCR 43
+    }else{if (TAC>maxTAC) TAC=maxTAC;} // SET MAX TAC
    
     if (TAC>0.0) closed=0;  // If there is a TAC the fishery is not closed 
 
@@ -9901,6 +10168,8 @@ FUNCTION finishOpModMode
             os<<"OFL=";os<<ptrOFLResults->OFL; os<<cc<<endl; // OFL
             os<<"B0=";os<<value(ptrOFLResults->B0);os<<cc<<endl; // B0
             os<<"Bmsy=";os<<value(ptrOFLResults->Bmsy);os<<cc<<endl; // Bmsy
+            os<<"Fmsy=";os<<value(ptrOFLResults->Fmsy);os<<cc<<endl; // Fmsy
+            os<<"Fofl=";os<<value(ptrOFLResults->Fofl);os<<cc<<endl; // Fofl
             os<<"MMB=";os<<MMB; os<<cc<<endl; // Mature Male Biomass 
             os<<"MFB=";os<<MFB; os<<cc<<endl; // Mature Female Biomass 
             os<<"ELMB=";os<<ELMB; os<<cc<<endl; // 5"< males 
@@ -10308,6 +10577,8 @@ FINAL_SECTION
             os<<"OFL=";os<<value(ptrOFLResults->OFL);os<<cc<<endl; // OFL
             os<<"B0=";os<<value(ptrOFLResults->B0);os<<cc<<endl; // B0
             os<<"Bmsy=";os<<value(ptrOFLResults->Bmsy);os<<cc<<endl; // Bmsy
+            os<<"Fmsy=";os<<value(ptrOFLResults->Fmsy);os<<cc<<endl; // Bmsy
+            os<<"Fofl=";os<<value(ptrOFLResults->Fofl);os<<cc<<endl; // Bmsy
             os<<"MMB="; os<<MMB; os<<cc<<endl; //
             os<<"MFB="; os<<MFB; os<<cc<<endl; // 
             os<<"ELMB=";os<<ELMB;os<<cc<<endl;

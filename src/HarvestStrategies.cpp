@@ -55,8 +55,8 @@ double HarvestStrategies::HCR1_FemaleRamp(double MFB, double aveMFB, double MMB)
  */
 double HarvestStrategies::HCR2_MaleRamp(double MMB, double aveMMB, int rampID){
     //Define look up table for ramps
-    double slopes[] = {5.0/75.0, 10.0/75.0, 15.0/75.0};
-    double intercepts[] = {0.0333, 0.01675, 0.0};
+    double slopes[] = {5.0/75.0, 10.0/75.0, 15.0/75.0, 17.5/75.0};
+    double intercepts[] = {0.0333, 0.01675, 0.0, -0.075};
     
     double maleRatio = MMB/aveMMB;
     double xp = 0;
@@ -144,7 +144,7 @@ double HarvestStrategies::HCR3_ABC(double OFL, double buffer){
 }
 
 /**
- * HCR 4. Scaled with females--> moving.
+ * HCR 4. Scaled with females--> moving. 5% to 20% Exploitation
  * 
  * @param MFB
  * @param aveMFB
@@ -182,7 +182,7 @@ double HarvestStrategies::HCR4_FemaleDimmer(double MFB, double aveMFB, double MM
             femRatio = 1.0;
         }
        
-    slope = ((femRatio-0.25)/5)/(maleRatio-0.25);
+    slope = ((femRatio-0.25)/5)/(1.0-0.25);
     intercept = -1*((slope*0.25)-0.05); // CHECK THIS WITH ANDRE y1???
         
     xp = maleRatio*slope + intercept; //I don't think i need to apply an intercept because of how the slope is taken, please confirm
@@ -192,6 +192,141 @@ double HarvestStrategies::HCR4_FemaleDimmer(double MFB, double aveMFB, double MM
     
     return TAC;  
 }
+
+/**
+ * 
+ * HCR4.1 --> Female Dimmer from 10% - 20%
+ * @param MFB
+ * @param aveMFB
+ * @param MMB
+ * @param aveMMB
+ * @return 
+ */
+
+double HarvestStrategies::HCR41_FemaleDimmer(double MFB, double aveMFB, double MMB, double aveMMB){
+    double femRatio = MFB/aveMFB;
+    double maleRatio = MMB/aveMMB;
+    double slope;
+    double intercept;
+    
+    double xp;
+    double TAC;
+    
+    if (maleRatio < 0.25){
+        return 0;
+    } 
+    
+    if (maleRatio >= 0.25 && femRatio < 0.25){
+            xp = 0.10;
+    }
+    
+    if (maleRatio >= 1.0){
+            maleRatio = 1.0;   
+    }
+    
+    if (femRatio >=1.0){
+            femRatio = 1.0;
+        }
+       
+    slope = ((femRatio-0.25)/7.5)/(1.0-0.25);
+    intercept = -1*((slope*0.25)-0.10); // CHECK THIS WITH ANDRE y1???
+        
+    xp = maleRatio*slope + intercept; //I don't think i need to apply an intercept because of how the slope is taken, please confirm
+    
+    
+    TAC = MMB*xp;
+    
+    return TAC;  
+}
+
+/**
+ * HCR 4.2 --> Female Dimmer from 10% t0 22.5% 
+ * @param MFB
+ * @param aveMFB
+ * @param MMB
+ * @param aveMMB
+ * @return 
+ */
+double HarvestStrategies::HCR42_FemaleDimmer(double MFB, double aveMFB, double MMB, double aveMMB){
+    double femRatio = MFB/aveMFB;
+    double maleRatio = MMB/aveMMB;
+    double slope;
+    double intercept;
+    
+    double xp;
+    double TAC;
+    
+    if (maleRatio < 0.25){
+        return 0;
+    } 
+    
+    if (maleRatio >= 0.25 && femRatio < 0.25){
+            xp = 0.10;
+    }
+    
+    if (maleRatio >= 1.0){
+            maleRatio = 1.0;
+    }
+    
+    if (femRatio >=1.0){
+            femRatio = 1.0;
+        }
+       
+    slope = ((femRatio-0.25)/6)/(1.0-0.25);
+    intercept = -1*((slope*0.25)-0.10); // CHECK THIS WITH ANDRE y1???
+        
+    xp = maleRatio*slope + intercept; //I don't think i need to apply an intercept because of how the slope is taken, please confirm
+    
+    
+    TAC = MMB*xp;
+    
+    return TAC;  
+}
+
+/**
+ * HCR43 --> Female Dimmer, Written so TAC max can be adjusted with if statement
+ * @param MFB
+ * @param aveMFB
+ * @param MMB
+ * @param aveMMB
+ * @return 
+ */
+double HarvestStrategies::HCR43_FemaleDimmer(double MFB, double aveMFB, double MMB, double aveMMB){
+    double femRatio = MFB/aveMFB;
+    double maleRatio = MMB/aveMMB;
+    double slope;
+    double intercept;
+    
+    double xp;
+    double TAC;
+    
+    if (maleRatio < 0.25){
+        return 0;
+    } 
+    
+    if (maleRatio >= 0.25 && femRatio < 0.25){
+            xp = 0.10;
+    }
+    
+    if (maleRatio >= 1.0){
+            maleRatio = 1.0;
+    }
+    
+    if (femRatio >=1.0){
+            femRatio = 1.0;
+        }
+       
+    slope = ((femRatio-0.25)/6)/(1.0-0.25);
+    intercept = -1*((slope*0.25)-0.10); // CHECK THIS WITH ANDRE y1???
+        
+    xp = maleRatio*slope + intercept; //I don't think i need to apply an intercept because of how the slope is taken, please confirm
+    
+    
+    TAC = MMB*xp;
+    
+    return TAC;  
+}
+
 
 /**
  * HCR 5. Scaled with females --> blocks.
