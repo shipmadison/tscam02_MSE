@@ -6125,7 +6125,7 @@ FUNCTION d5_array calcNLLs_CatchNatZ(SizeFrequencyData* ptrZFD, dvar5_array& mA_
                                 cout<<"ss = "<<ss<<endl;
                                 cout<<"oP_Z = "<<oP_z<<endl;
                             }
-                            if (m<=nMSs) {for (int s=1;s<=nSCs;s++) mP_z(mnz,mxz).shift(1) += mA_yxmsz(y,x,m,s);}
+                            if (m<=nMSs) for {(int s=1;s<=nSCs;s++) mP_z(mnz,mxz).shift(1) += mA_yxmsz(y,x,m,s)};
                         }//m
                     }//x
                     if (sum(oP_z)>0) oP_z /= sum(oP_z);
@@ -8618,7 +8618,7 @@ FUNCTION int calcTAC(int hcr, double OFL)  //int calcOption
     if(hcr==3){ TAC = TAC; //uncap TAC
     }else if(hcr==43){ if (TAC>maxTAC30) TAC=maxTAC30; // SET MAX TAC at 30% ELM for HCR 43
         PRINT2B2("#maxTAC30=", maxTAC30)
-    }else{if (TAC>maxTAC) TAC=maxTAC;} // SET MAX TAC
+    }else if (TAC>maxTAC) TAC=maxTAC;} // SET MAX TAC
 
    
     if (TAC>0.0) closed=0;  // If there is a TAC the fishery is not closed 
@@ -8978,7 +8978,7 @@ FUNCTION double repTAC(int hcr, double OFL)  //int calcOption
     if(hcr==3){ TAC = TAC; //uncap TAC
     }else if(hcr==43){ if (TAC>maxTAC30) TAC=maxTAC30; // SET MAX TAC at 30% ELM for HCR 43
         PRINT2B2("#maxTAC30=", maxTAC30)
-    }else{if (TAC>maxTAC) TAC=maxTAC;} // SET MAX TAC
+    }else if (TAC>maxTAC) TAC=maxTAC;} // SET MAX TAC
 
  
     //--save TAC and OFL to file for OpMod to read
@@ -9375,7 +9375,7 @@ FUNCTION int calcTAC_OpMod(int hcr, double OFL)  //int calcOption
     if(hcr==3){ TAC = TAC; //uncap TAC
     }else if(hcr==43){ if (TAC>maxTAC30) TAC=maxTAC30; // SET MAX TAC at 30% ELM for HCR 43
         PRINT2B2("#maxTAC30=", maxTAC30)
-    }else{if (TAC>maxTAC) TAC=maxTAC;} // SET MAX TAC
+    }else if (TAC>maxTAC) TAC=maxTAC;} // SET MAX TAC
 
     if (TAC>0.0) closed=0;  // If there is a TAC the fishery is not closed 
 
@@ -9765,7 +9765,7 @@ FUNCTION double repTAC_OpMod(int hcr, double OFL)  //int calcOption
 
     if(hcr==3){ TAC = TAC; //uncap TAC
     }else if(hcr==43){ if (TAC>maxTAC30) TAC=maxTAC30; // SET MAX TAC at 30% ELM for HCR 43
-    }else{if (TAC>maxTAC) TAC=maxTAC;} // SET MAX TAC
+    }else if (TAC>maxTAC) TAC=maxTAC;} // SET MAX TAC
    
     if (TAC>0.0) closed=0;  // If there is a TAC the fishery is not closed 
 
