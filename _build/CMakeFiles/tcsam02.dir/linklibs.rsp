@@ -1,0 +1,1 @@
+ C:/GitHub/TannerMSE/wtsADMB/_build/libwtsADMB.a "C:/ADMB-13.1/lib/libadmb-contrib-mingw64-g++10.a" -lkernel32 -luser32 -lgdi32 -lwinspool -lshell32 -lole32 -loleaut32 -luuid -lcomdlg32 -ladvapi32 
