@@ -1,0 +1,3 @@
+# Hashes of file build rules.
+7511de5613898bc965c3f3a424a740bb tcsam02.cpp
+98f3963fe9ee4816edf2f14357797cc3 tcsam02.tpl
