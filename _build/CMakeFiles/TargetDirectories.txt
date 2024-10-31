@@ -1,3 +1,0 @@
-C:/GitHub/TannerMSE/tscam02_MSE/_build/CMakeFiles/tcsam02.dir
-C:/GitHub/TannerMSE/tscam02_MSE/_build/CMakeFiles/edit_cache.dir
-C:/GitHub/TannerMSE/tscam02_MSE/_build/CMakeFiles/rebuild_cache.dir
