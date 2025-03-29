@@ -4312,7 +4312,7 @@ FUNCTION void calcOFL(int yr, int debug, ostream& cout)
         if (debug) cout<<"declared pOC."<<endl;
         
     //9. Determine TIER LEVEL, define Tier_Calculators, calculate OFL
-        int tier = 3;
+        int tier = 4;// THIS IS HARD CODED FOR NOW, TIER 4 -- Later add this switch in the control file MHS 3.29.25 
         if (tier==3){
             //5. Determine Fmsy and Bmsy
             Tier3_Calculator* pT3CM = new Tier3_Calculator(0.35,pECM);
@@ -4336,7 +4336,31 @@ FUNCTION void calcOFL(int yr, int debug, ostream& cout)
                 Tier3_Calculator::debug=0;
                 Equilibrium_Calculator::debug=0;
             }
-        }//Tier 3 calculation
+        }//End of Tier 3 calculation
+        if (tier==4){ //start of Tier 4 calculation
+            //5. Determine Fmsy and Bmsy
+            Tier4_Calculator* pT4CM = new Tier4_Calculator(0.35,pECM);
+            Tier4_Calculator* pT4CF = new Tier4_Calculator(0.35,pECF);
+            if (debug) cout<<"created pT4Cs."<<endl;
+            pOC = new OFL_Calculator(pT4CM,pT4CF);
+            if (debug) {
+                cout<<"created pOC."<<endl;
+                OFL_Calculator::debug=1;
+                Tier3_Calculator::debug=1;
+                Equilibrium_Calculator::debug=0;
+                cout<<"Calculating ptrOFLResults"<<endl;
+            }
+            ptrOFLResults = pOC->calcOFLResults(avgRec_x,n_xmsz,cout);
+            if (debug) {
+                cout<<"calculated ptrOFLResults->"<<endl;
+                ptrOFLResults->writeCSVHeader(cout); cout<<endl;
+                ptrOFLResults->writeToCSV(cout); cout<<endl;
+                ptrOFLResults->writeToR(cout,ptrMC,"oflResults",0); cout<<endl;
+                OFL_Calculator::debug=0;
+                Tier3_Calculator::debug=0;
+                Equilibrium_Calculator::debug=0;
+            }
+        }//Tier 4 calculation
     
     if (debug) {
         int n = 100;
@@ -4387,7 +4411,7 @@ FUNCTION void calcOFL_OpMod(int debug, ostream& cout)
     //yr = yr;//don't have pop rates, etc. for projection year --- KEEP YEAR AT YEAR?
     //if (debug) cout<<"year for pop rates = "<<yr<<endl;
     
-    //3. Determine mean recruitment --Keep this?
+    //3. Determine mean recruitment 
         //NOT SURE IF THIS SHOULD BE ALTERED 
     //   1981 here corresponds to 1982 in TCSAM2013, the year recruitment enters
     //   the model population.
@@ -4492,7 +4516,7 @@ FUNCTION void calcOFL_OpMod(int debug, ostream& cout)
         if (debug) cout<<"declared pOC."<<endl;
         
     //9. Determine TIER LEVEL, define Tier_Calculators, calculate OFL
-        int tier = 3;
+        int tier = 4; // This seems to be hard coded, but could add an external switch? 
         if (tier==3){
             //5. Determine Fmsy and Bmsy
             Tier3_Calculator* pT3CM = new Tier3_Calculator(0.35,pECM);
@@ -4516,8 +4540,31 @@ FUNCTION void calcOFL_OpMod(int debug, ostream& cout)
                 Tier3_Calculator::debug=0;
                 Equilibrium_Calculator::debug=0;
             }
+        }//End Tier 3 calculation
+        if (tier==4){ // Start of Tier 4 calculation
+            //5. Determine Fmsy and Bmsy
+            Tier3_Calculator* pT3CM = new Tier3_Calculator(0.35,pECM);
+            Tier3_Calculator* pT3CF = new Tier3_Calculator(0.35,pECF);
+            if (debug) cout<<"created pT3Cs."<<endl;
+            pOC = new OFL_Calculator(pT3CM,pT3CF);
+            if (debug) {
+                cout<<"created pOC."<<endl;
+                OFL_Calculator::debug=1;
+                Tier3_Calculator::debug=1;
+                Equilibrium_Calculator::debug=0;
+                cout<<"Calculating ptrOFLResults"<<endl;
+            }
+            ptrOFLResults = pOC->calcOFLResults(avgRec_x,prj_n_xmsz,cout);
+            if (debug) {
+                cout<<"calculated ptrOFLResults->"<<endl;
+                ptrOFLResults->writeCSVHeader(cout); cout<<endl;
+                ptrOFLResults->writeToCSV(cout); cout<<endl;
+                ptrOFLResults->writeToR(cout,ptrMC,"oflResults",0); cout<<endl;
+                OFL_Calculator::debug=0;
+                Tier3_Calculator::debug=0;
+                Equilibrium_Calculator::debug=0;
+            }
         }//Tier 3 calculation
-    
         PRINT2B1("OFL Op model function done")
         
 //-------------------------------------------------------------------------------------

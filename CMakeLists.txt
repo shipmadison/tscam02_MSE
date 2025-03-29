@@ -27,7 +27,7 @@ set(TPL "tcsam02")
 set(TPL_BASE "../${TPL}.tpl")
 set(${TPL}_INCLUDE "include")
 set(${TPL}_SRC "src")
-set(ADMB_HOME "C:/ADMB-13.1")
+set(ADMB_HOME "C:/ADMB-13.2")
 set(WTSADMB_HOME "C:/GitHub/TannerMSE/wtsADMB")
 set(myCXX_FLAGS "-DUSE_ADMB_CONTRIBS")
 
