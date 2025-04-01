@@ -11,6 +11,7 @@ using namespace tcsam;
 /** flags to print debug info */
 int Equilibrium_Calculator::debug = 0;
 int Tier3_Calculator::debug = 0;
+int Tier4_Calculator::debug = 0;
 int OFL_Calculator::debug = 0;
 int OFLResults::debug = 0;
 ////////////////////////////////////////////////////////////////////////////////

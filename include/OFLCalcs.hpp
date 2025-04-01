@@ -221,32 +221,6 @@ class Tier3_Calculator : public Tier_Calculator {
 };
 
 /**
- * Tier_Calculator class to do Tier 4 calculations for Bmsy, and Fmsy
- * based on proxies (Bmsy=Bprox, Fmsy=gamma*M).
- */
-class Tier4_Calculator : public Tier_Calculator {
-    public:
-        static int debug;
-    /**
-         * Class destructor (calls superclass destructor).
-         */
-        ~Tier4_Calculator(){}
-        
-        /**
-         * Calculate directed fishery capture rate, Fmsy, for Tier 4 stocks.
-         * Fmsy is assumed to be 
-         * 
-         * @param spB_yr - biomass projected to time of mating
-         * @param Bmsy_prox - moving average of biomass at time of mating (minus catches) from 1985 to yr-1 
-         * @param gamma - scaler on M for Fmsy calcs (in case this is not assumed to be 1.0)
-         * @param cout - output stream for debug info
-         * 
-         * @return Fmsy
-         */
-        dvariable calcTier4_Fprox(dvariable spB_yr, dvariable Bmsy_prox, double gamma, ostream& cout); //COME BACK TO THIS
-};
-
-/**
  * Convenience class encapsulating OFL results for one model (MCMC) instance
  */
 class OFLResults {

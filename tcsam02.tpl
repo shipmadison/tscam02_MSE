@@ -4338,11 +4338,22 @@ FUNCTION void calcOFL(int yr, int debug, ostream& cout)
             }
         }//End of Tier 3 calculation
         if (tier==4){ //start of Tier 4 calculation
-            //5. Determine Fmsy and Bmsy
+            //5. Determine Bmsy_prox
+            dmatrix vspB_yx = value(spB_yx); // IS THIS AFTER FISHING? 
+            ivector perm(1,2); perm[1]=2;perm[2]=1; //switch the order of y and x in the dmatrix
+            dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
+            double Bmsy_prox = mean(vspB_xy(MALE)(1985,mxYr-1));
+            cout<<"MHS TEST FOR Bmsy_prox."<<endl;
+            cout<<"Bmsy_prox = "<<Bmsy_prox<<endl;
+
+            //6. Determine prjB as a Tier4_Calc input
+            double spB_yr = vspB_yx(mxYr, MALE)
+            cout<<"spB_yr = "<<spB_yr<<endl;
+            //7. Determine Fmsy 
+            
             Tier4_Calculator* pT4CM = new Tier4_Calculator(0.35,pECM);
-            Tier4_Calculator* pT4CF = new Tier4_Calculator(0.35,pECF);
-            if (debug) cout<<"created pT4Cs."<<endl;
-            pOC = new OFL_Calculator(pT4CM,pT4CF);
+            if (debug) cout<<"created pT4C."<<endl;
+            pOC = new OFL_Calculator(pT4CM,nullptr); // Come back here to sort out if I should use this at all. 
             if (debug) {
                 cout<<"created pOC."<<endl;
                 OFL_Calculator::debug=1;
@@ -4542,7 +4553,11 @@ FUNCTION void calcOFL_OpMod(int debug, ostream& cout)
             }
         }//End Tier 3 calculation
         if (tier==4){ // Start of Tier 4 calculation
-            //5. Determine Fmsy and Bmsy
+            //5. Determine Bmsy_prox
+
+            //6. Determine prjB as a Tier4_Calc input
+
+            //7. Determine Fmsy
             Tier3_Calculator* pT3CM = new Tier3_Calculator(0.35,pECM);
             Tier3_Calculator* pT3CF = new Tier3_Calculator(0.35,pECF);
             if (debug) cout<<"created pT3Cs."<<endl;
