@@ -430,5 +430,94 @@ class OFL_Calculator{
         OFLResults* calcOFLResults(dvar_vector R, dvar4_array& n_xmsz, ostream& cout);
 };//OFL_Calculator
 
+/**
+ * Class to calculate OFL results at the Tier 4 level.
+ */
+class OFL_Calculator_Tier4{
+    public:
+        static int debug;//flag to print debugging info
+        static const int maxIts = 5;//max iterations when calculating Fofl using the HCR
+
+    public:
+        double M;     // Proxy for Fmsy; M = 0.23
+        double alpha; //HCR intercept on (B/Bmsy) axis
+        double beta;  //(B/Bmsy) limit below which the directed fishery is closed
+        dvariable Bmsy_proxy;  ///< proxy Bmsy: average MMB at mating from 1982–yr-1
+
+    public:
+        dvariable prjMMB;  //projected ("current") MMB when OFL is taken
+        dvar_matrix ofl_fx; //catch by sex/fishery when OFL is taken
+       
+    public:
+        PopProjector* pPrjM;  // pointer to PopProjector used for Tier 4 projections
+        
+    public:
+        /**
+         * Constructor.
+         * 
+         * @param pPrj - pointer to PopProjector object
+         * @param Bmsy_prox - proxy for Bmsy (average historical MMB)
+         */
+        OFL_Calculator_Tier4(PopProjector* pPrj, dvariable Bmsy_prox);
+        
+        /**
+         * Calculate Fofl using the Harvest Control Rule (HCR).
+         * 
+         * @param currMMB - "current" MMB used to determine B/Bmsy
+         * @param Bmsy - Bmsy
+         * @param Fmsy - Fmsy
+         * @param cout - output stream for debug info
+         * 
+         * @return Fofl derived from HCR
+         */
+        dvariable calcHCR(dvariable currMMB, dvariable Bmsy, dvariable Fmsy, ostream& cout);
+        /**
+         * Calculate Fofl using the Harvest Control Rule (HCR).
+         * 
+         * @param Bmsy_prox - equilibrium MMB when population fished at Fmsy
+         * @param M_msz - natural mortality array for Tier 4
+         * @param n_msz - initial (July 1) male abundance
+         * @param cout - output stream for debug info
+         * 
+         * @return Fofl derived from HCR
+         */
+    
+        dvariable calcFofl(dvariable Bmsy_prox, dvar3_array& M_msz, dvar3_array& n_msz, ostream& cout);
+        /**
+         * Calculate the total OFL (biomass) using Tier 4 logic.
+         * when fishing on population starting with initial abundance (July 1)
+         * 
+         * @param Fofl - directed fishery capture rate
+         * @param M_msz - natural mortality array for Tier 4
+         * @param n_xmsz - initial population abundance
+         * @param cout - output stream for debug info
+         * 
+         * @return total OFL (biomass)
+         */
+        dvariable calcOFL(dvariable Fofl, dvar3_array& M_msz, dvar4_array& n_xmsz, ostream& cout);
+        /**
+         * Calculate the (projected) MMB when fished at Fofl.
+         * 
+         * @param Fofl - target fishery capture rate
+         * @param M_msz - natural mortality array for Tier 4
+         * @param n_msz - initial (July 1) population
+         * @param cout - output stream for debug info
+         * 
+         * @return - the (projected) MMB
+         */
+        dvariable calcPrjMMB(dvariable Fofl, dvar3_array& M_msz, dvar3_array& n_msz, ostream& cout);
+        /**
+         * Calculate all results associated with the OFL.
+         * 
+         * @param R - assumed equilibrium recruitment, by sex
+         * @param M_msz - natural mortality array for Tier 4
+         * @param n_xmsz - dvar4_array with initial population abundance
+         * @param cout - output stream for debug info
+         * 
+         * @return pointer to OFLResults object.
+         */
+        OFLResults* calcOFLResults(dvar_vector R, dvar3_array& M_msz, dvar4_array& n_xmsz, ostream& cout);
+};//OFL_Calculator_Tier4
+
 #endif	/* OFLCALCS_HPP */
 

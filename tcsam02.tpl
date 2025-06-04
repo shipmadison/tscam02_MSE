@@ -1488,7 +1488,7 @@ DATA_SECTION
     number inpOFL; //OFL for upcoming year
     number inpTAC; //TAC for upcoming year
  LOCAL_CALCS
-    if (mseOpModMode){
+    if (mseOpModMode){  
         PRINT2B1("#--Creating ptrOMI")
         ptrOMI = new MSE_OpModInfo(ptrMC);
         ad_comm::change_datafile_name("OpModStateFile.txt");
@@ -4153,6 +4153,7 @@ FUNCTION void calcOFL(int yr, int debug, ostream& cout)
         cout<<endl<<endl<<"#------------------------"<<endl;
         cout<<"starting calcOFL(yr,debug,cout)"<<endl;
         cout<<"year for projection = "<<yr<<endl;
+        cout << "Entering calcOFL for Tier = " << ptrMOs->Tier << endl;
     }
 
     //1. get initial population for "upcoming" year, yr
@@ -4174,7 +4175,7 @@ FUNCTION void calcOFL(int yr, int debug, ostream& cout)
         avgRec_x(x)= mean(elem_prod(R_y(1981,yr),column(R_yx,x)(1981,yr)));
     if (debug) {
         cout<<"R_y(  1981:"<<yr<<")      = "<<R_y(1981,yr)<<endl;
-        cout<<"R_yx((1981:"<<yr<<",MALE) = "<<column(R_yx,MALE)(1981,yr)<<endl;
+        cout<<"R_yx(1981:"<<yr<<",MALE) = "<<column(R_yx,MALE)(1981,yr)<<endl;
         cout<<"Average recruitment = "<<avgRec_x<<endl;
     }
 
@@ -4282,6 +4283,7 @@ FUNCTION void calcOFL(int yr, int debug, ostream& cout)
         pCIM->setSelectivityFcns(avgSFcn_xfmsz(MALE));
         pCIM->setRetentionFcns(avgRFcn_xfmsz(MALE));
         pCIM->setHandlingMortality(avgHM_f);
+        pCIM->sex = MALE; //for Tier4 
         dvariable maxCapF = pCIM->findMaxTargetCaptureRate(cout);
         if (debug) cout<<"maxCapF = "<<maxCapF<<endl;
         
@@ -4292,7 +4294,8 @@ FUNCTION void calcOFL(int yr, int debug, ostream& cout)
         pCIF->setRetentionFcns(avgRFcn_xfmsz(FEMALE));
         pCIF->setHandlingMortality(avgHM_f);
         pCIF->maxF = maxCapF;//need to set this for females
-        
+        //pCIF->sex = FEMALE; //for Tier4 
+
     //6. Create PopProjectors
         PopProjector* pPPM = new PopProjector(pPIM,pCIM);
         pPPM->dtF = dtF;
@@ -4312,8 +4315,10 @@ FUNCTION void calcOFL(int yr, int debug, ostream& cout)
         if (debug) cout<<"declared pOC."<<endl;
         
     //9. Determine TIER LEVEL, define Tier_Calculators, calculate OFL
-        int tier = 4;// THIS IS HARD CODED FOR NOW, TIER 4 -- Later add this switch in the control file MHS 3.29.25 
+    int tier = ptrMOs->Tier;
+    //int tier = 4;
         if (tier==3){
+            cout<<"Tier 3 calculations"<<endl;
             //5. Determine Fmsy and Bmsy
             Tier3_Calculator* pT3CM = new Tier3_Calculator(0.35,pECM);
             Tier3_Calculator* pT3CF = new Tier3_Calculator(0.35,pECF);
@@ -4336,44 +4341,51 @@ FUNCTION void calcOFL(int yr, int debug, ostream& cout)
                 Tier3_Calculator::debug=0;
                 Equilibrium_Calculator::debug=0;
             }
-        }//End of Tier 3 calculation
-        if (tier==4){ //start of Tier 4 calculation
-            //5. Determine Bmsy_prox
-            dmatrix vspB_yx = value(spB_yx); // IS THIS AFTER FISHING? 
-            ivector perm(1,2); perm[1]=2;perm[2]=1; //switch the order of y and x in the dmatrix
-            dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
-            double Bmsy_prox = mean(vspB_xy(MALE)(1985,mxYr-1));
-            cout<<"MHS TEST FOR Bmsy_prox."<<endl;
-            cout<<"Bmsy_prox = "<<Bmsy_prox<<endl;
-
-            //6. Determine prjB as a Tier4_Calc input
-            double spB_yr = vspB_yx(mxYr, MALE)
-            cout<<"spB_yr = "<<spB_yr<<endl;
-            //7. Determine Fmsy 
+        }//Tier 3 calculation ends and Tier 4 begins
+        if (tier==4){
+            cout<<"Tier 4 calculations"<<endl;
+            // 1. Calc/Pull BmsyProxy
+            dmatrix vspB_yx = value(spB_yx);
+            ivector perm(1,2); perm[1]=2; perm[2]=1; 
+            dmatrix vspB_xy = wts::permuteDims(perm, vspB_yx);
+            double BmsyProx = mean(vspB_xy(MALE)(1982, yr));
+            PRINT2B2("BmsyProx_estmod=", BmsyProx);
+              
+            // 2. Create Tier 4 OFL Calculator
+            PRINT2B2("pPPM=", pPPM);
+            //problem is 1) can't contruct 2) blowing up mid constuct or 3) ....
             
-            Tier4_Calculator* pT4CM = new Tier4_Calculator(0.35,pECM);
-            if (debug) cout<<"created pT4C."<<endl;
-            pOC = new OFL_Calculator(pT4CM,nullptr); // Come back here to sort out if I should use this at all. 
-            if (debug) {
-                cout<<"created pOC."<<endl;
-                OFL_Calculator::debug=1;
-                Tier3_Calculator::debug=1;
-                Equilibrium_Calculator::debug=0;
-                cout<<"Calculating ptrOFLResults"<<endl;
+            OFL_Calculator_Tier4* pOC4 = new OFL_Calculator_Tier4(pPPM, BmsyProx);
+            PRINT2B1("Past OFL_Calc");
+            if (1) {
+                cout<<"created pOC4."<<endl;
+                OFL_Calculator_Tier4::debug = 1;
+                cout<<"Calculating ptrOFLResults (Tier 4) 1:"<<endl;
             }
-            ptrOFLResults = pOC->calcOFLResults(avgRec_x,n_xmsz,cout);
-            if (debug) {
-                cout<<"calculated ptrOFLResults->"<<endl;
+            PRINT2B1("Past OFL_Calc Debug");
+            // 3. Get results
+            dvar3_array M_msz = M_yxmsz(yr, MALE); 
+            cout<<"About to call pOC4->calcOFLResults()"<<endl;
+            ptrOFLResults = pOC4->OFL_Calculator_Tier4::calcOFLResults(avgRec_x, M_msz, n_xmsz, cout);
+            PRINT2B2("Past OFL Results",ptrOFLResults);
+            if (!ptrMC) {
+                cout<<"WARNING: ptrMC is NULL before writeToR()"<<endl;
+            } else {
+                //ptrOFLResults->writeToR(cout, ptrMC, "oflResults", 0);
+            }
+            PRINT2B1("stalled at writeToR");
+            //if (debug) {
+                cout<<"calculated ptrOFLResults (Tier 4) 2:"<<endl;
                 ptrOFLResults->writeCSVHeader(cout); cout<<endl;
                 ptrOFLResults->writeToCSV(cout); cout<<endl;
-                ptrOFLResults->writeToR(cout,ptrMC,"oflResults",0); cout<<endl;
-                OFL_Calculator::debug=0;
-                Tier3_Calculator::debug=0;
-                Equilibrium_Calculator::debug=0;
-            }
-        }//Tier 4 calculation
+                //ptrOFLResults->writeToR(cout, ptrMC, "oflResults", 0); cout<<endl;
+                OFL_Calculator_Tier4::debug = 0;
+            PRINT2B1("Tier 4 Caclulation Complete");
+           // }
+            //PRINT2B1("Tier 4 Caclulation Complete");
+        }//Tier 4 calculation done
     
-    if (debug) {
+    if (1) {
         int n = 100;
         MultiYearPopProjector* pMYPPM = new MultiYearPopProjector(pPPM);
         MultiYearPopProjector* pMYPPF = new MultiYearPopProjector(pPPF);
@@ -4408,7 +4420,8 @@ FUNCTION void calcOFL_OpMod(int debug, ostream& cout)
         cout<<"starting calcOFL_OpMod(debug,cout)"<<endl;
         //cout<<"year for projection = "<<yr<<endl;
     }
-
+    cout<<"starting calcOFL_OpMod(debug,cout)"<<endl;
+    PRINT2B1("startign calcOFL_OpMod");
     //1. get initial population -- unlike calcOFL there is no year component
 
     //dvar4_array n_xmsz = n_yxmsz(yr); Get rid of this line, as we don't want years
@@ -4422,7 +4435,7 @@ FUNCTION void calcOFL_OpMod(int debug, ostream& cout)
     //yr = yr;//don't have pop rates, etc. for projection year --- KEEP YEAR AT YEAR?
     //if (debug) cout<<"year for pop rates = "<<yr<<endl;
     
-    //3. Determine mean recruitment 
+    //3. Determine mean recruitment --Keep this?
         //NOT SURE IF THIS SHOULD BE ALTERED 
     //   1981 here corresponds to 1982 in TCSAM2013, the year recruitment enters
     //   the model population.
@@ -4497,6 +4510,7 @@ FUNCTION void calcOFL_OpMod(int debug, ostream& cout)
         pCIM->setSelectivityFcns(avgSFcn_xfmsz(MALE));
         pCIM->setRetentionFcns(avgRFcn_xfmsz(MALE));
         pCIM->setHandlingMortality(avgHM_f);
+        pCIM->sex = MALE; //for Tier4 
         dvariable maxCapF = pCIM->findMaxTargetCaptureRate(cout);
         if (debug) cout<<"maxCapF = "<<maxCapF<<endl;
         
@@ -4527,7 +4541,8 @@ FUNCTION void calcOFL_OpMod(int debug, ostream& cout)
         if (debug) cout<<"declared pOC."<<endl;
         
     //9. Determine TIER LEVEL, define Tier_Calculators, calculate OFL
-        int tier = 4; // This seems to be hard coded, but could add an external switch? 
+        int tier = ptrMOs->Tier;
+        //int tier = 4;
         if (tier==3){
             //5. Determine Fmsy and Bmsy
             Tier3_Calculator* pT3CM = new Tier3_Calculator(0.35,pECM);
@@ -4551,35 +4566,37 @@ FUNCTION void calcOFL_OpMod(int debug, ostream& cout)
                 Tier3_Calculator::debug=0;
                 Equilibrium_Calculator::debug=0;
             }
-        }//End Tier 3 calculation
-        if (tier==4){ // Start of Tier 4 calculation
-            //5. Determine Bmsy_prox
-
-            //6. Determine prjB as a Tier4_Calc input
-
-            //7. Determine Fmsy
-            Tier3_Calculator* pT3CM = new Tier3_Calculator(0.35,pECM);
-            Tier3_Calculator* pT3CF = new Tier3_Calculator(0.35,pECF);
-            if (debug) cout<<"created pT3Cs."<<endl;
-            pOC = new OFL_Calculator(pT3CM,pT3CF);
+        }//Tier 3 calculation ends Tier 4 begins 
+        if (tier==4){
+            if (debug) cout<<"Tier 4 calculations for OM"<<endl;
+            cout<<"Tier 4 calculations for OM"<<endl;
+            PRINT2B1("Got to Tier 4 OpMod");
+            // 1. Calc/Pull BmsyProxy
+            dmatrix vspB_yx = value(spB_yx);
+            ivector perm(1,2); perm[1]=2; perm[2]=1; 
+            dmatrix vspB_xy = wts::permuteDims(perm, vspB_yx);
+            double BmsyProx = mean(vspB_xy(MALE)(1982, yr));
+            PRINT2B2("BmsyProx_opmod=", BmsyProx)
+              
+            // 2. Create Tier 4 OFL Calculator
+            OFL_Calculator_Tier4* pOC4 = new OFL_Calculator_Tier4(pPPM, BmsyProx);
             if (debug) {
-                cout<<"created pOC."<<endl;
-                OFL_Calculator::debug=1;
-                Tier3_Calculator::debug=1;
-                Equilibrium_Calculator::debug=0;
-                cout<<"Calculating ptrOFLResults"<<endl;
+                cout<<"created pOC4."<<endl;
+                OFL_Calculator_Tier4::debug = 1;
+                cout<<"Calculating ptrOFLResults (Tier 4)"<<endl;
             }
-            ptrOFLResults = pOC->calcOFLResults(avgRec_x,prj_n_xmsz,cout);
+            // 3. Get results
+            dvar3_array M_msz = ptrOMI->M_xmsz(MALE); 
+            ptrOFLResults = pOC4->calcOFLResults(avgRec_x, M_msz, prj_n_xmsz, cout);
             if (debug) {
-                cout<<"calculated ptrOFLResults->"<<endl;
+                cout<<"calculated ptrOFLResults (Tier 4):"<<endl;
                 ptrOFLResults->writeCSVHeader(cout); cout<<endl;
                 ptrOFLResults->writeToCSV(cout); cout<<endl;
-                ptrOFLResults->writeToR(cout,ptrMC,"oflResults",0); cout<<endl;
-                OFL_Calculator::debug=0;
-                Tier3_Calculator::debug=0;
-                Equilibrium_Calculator::debug=0;
+                ptrOFLResults->writeToR(cout, ptrMC, "oflResults", 0); cout<<endl;
+                OFL_Calculator_Tier4::debug = 0;
             }
-        }//Tier 3 calculation
+        }//Tier 4 calculation done
+    
         PRINT2B1("OFL Op model function done")
         
 //-------------------------------------------------------------------------------------
@@ -6990,7 +7007,7 @@ FUNCTION void writeMCMCtoR(ofstream& mcmc)
         mcmc<<"MB_xy="; wts::writeToR(mcmc,trans(value(spB_yx)),xDms,yDms); 
         if (doOFL){
             mcmc<<cc<<endl;
-            calcOFL(mxYr+1,0,cout);//updates oflresults
+            calcOFL(mxYr+1,1,cout);//updates oflresults
             ptrOFLResults->writeToR(mcmc,ptrMC,"ptrOFLResults",0);//mcm<<cc<<endl;
         }
         
@@ -7709,13 +7726,19 @@ FUNCTION void ReportToR(ostream& os, double maxGrad, int debug, ostream& cout)
         //do OFL calculations
         if (doOFL&&last_phase()){
             cout<<"ReportToR: starting OFL calculations"<<endl;
+            cout<<"A: opening echoOFL"<<endl;
             ofstream echoOFL; echoOFL.open("calcOFL.final.txt", ios::trunc);
             echoOFL.precision(12);
+            cout<<"B: calling calcOFL"<<endl;
             calcOFL(mxYr+1,1,echoOFL);//updates ptrOFLResults
+            cout<<"C: writeCSVHeader"<<endl;
             ptrOFLResults->writeCSVHeader(echoOFL); echoOFL<<endl;
+            cout<<"D: writeCSV"<<endl;
             ptrOFLResults->writeToCSV(echoOFL);     echoOFL<<endl;
             echoOFL.close();
+            cout<<"E: closing echoOFL"<<endl;
             os<<","<<endl;
+            cout<<"F: writeToR"<<endl;
             ptrOFLResults->writeToR(os,ptrMC,"ptrOFLResults",0);
             os<<"#end of ptrOFLResults"<<endl;
             cout<<"ReportToR: finished OFL calculations"<<endl;
@@ -8710,16 +8733,16 @@ FUNCTION double repTAC(int hcr, double OFL)  //int calcOption
        // ID Biomass 
         dmatrix vspB_yx = value(spB_yx);
         double MMB = vspB_yx(mxYr,  MALE);
-        PRINT2B2("MMB_estmodTAC=", MMB)
+        PRINT2B2("MMB_opmodTAC=", MMB)
         double MFB = vspB_yx(mxYr,FEMALE);
-        PRINT2B2("MFB_estmodTAC=", MFB)
+        PRINT2B2("MFB_opmodTAC=", MFB)
 
        //ID AveBiomass
         ivector perm(1,2); perm[1]=2;perm[2]=1; //transposing to move from sex and year to yr and sex 
         dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
         //double aveMFB = mean(vspB_xy(FEMALE)(1982,2017));
         double aveMFB = mean(vspB_xy(FEMALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));
-        PRINT2B2("aveMFB_estmodTAC=", aveMFB)
+        PRINT2B2("aveMFB_opmodTAC=", aveMFB)
        // TAC 
 
         TAC = HarvestStrategies::HCR1_FemaleRamp(MFB, aveMFB, MMB);
@@ -8733,13 +8756,13 @@ FUNCTION double repTAC(int hcr, double OFL)  //int calcOption
         //Identify Biomass
         dmatrix vspB_yx = value(spB_yx);
         double MMB = vspB_yx(mxYr,  MALE);
-        PRINT2B2("MMB_estmod=",MMB)
+        PRINT2B2("MMB_opmod=",MMB)
         
         //Identify Biomass Average
         ivector perm(1,2); perm[1]=2;perm[2]=1; //what does this line do?
         dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
         double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));// HCRx,copy in for HCR2 in model options
-        PRINT2B2("aveMMB_estmod=",aveMMB)
+        PRINT2B2("aveMMB_opmod=",aveMMB)
 
         PRINT2B1("#----Establish exploitation rate rampID")
         int rampID = ptrMOs->HCR2_rampID; // HAVE BUCK CHECK THIS rampID 
@@ -8779,7 +8802,7 @@ FUNCTION double repTAC(int hcr, double OFL)  //int calcOption
         dmatrix vspB_xy = wts::permuteDims(perm,vspB_yx);
         
         double aveMMB = mean(vspB_xy(MALE)(ptrMOs->HCR_avgMinYr,ptrMOs->HCR_avgMaxYr));// HCRx,copy in for HCR2 in model options
-        PRINT2B2("aveMMB_estmod=",aveMMB)
+        PRINT2B2("aveMMB_opmod=",aveMMB)
 
         TAC = HarvestStrategies::HCR22_MaleRamp_SurvEst(MMB, aveMMB);
         info = "#--HCR22: MMB = "+str(MMB)+cc+"aveMMB = "+str(aveMMB)+cc+"ratio = "+str(MMB/aveMMB)+cc+"TAC = "+str(TAC);

@@ -284,6 +284,8 @@ class EffXtrapScenarios{
         
         /** options for MSEs*/
         adstring_array optsMSE;
+        /** Federal OFL Tier to use */
+        int Tier;
         /** harvest control rule to use */
         int HCR; 
         /** min year for averaging in HCR 1*/

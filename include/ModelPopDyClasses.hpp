@@ -3,6 +3,7 @@
  * Author: WilliamStockhausen
  *
  * Created on November 3, 2018, 2:45 PM
+ * Edited on April 7, 2025 by Madison HS
  */
 
 #ifndef MODELPOPDYCLASSES_HPP
@@ -130,6 +131,8 @@ class CatchInfo {
         int nSCs;//number of shell conditions
         int nZBs;//number of size bins
         int nFsh;//number of fisheries
+
+        int sex; // Add this to store the sex (MALE or FEMALE) for applyF_Tier4
         
     public:
         /** maximum capture rate in target fishery */
@@ -213,6 +216,18 @@ class CatchInfo {
          * 
          */
         dvar3_array applyFM(dvariable dirF, dvar3_array& n_msz, ostream& cout);
+         /**
+         * Tier 4 version of applyFM. Applies fishing mortality rate 'fofl' directly,
+         * assuming simplified Tier 4 rules (e.g., no scaling by maxF, possibly no bycatch).
+         * 
+         * @param M_msz - proxy fishery capture rate for Tier 4
+         * @param n_msz - pre-fisheries population size
+         * @param cout - stream for writing debug info
+         * 
+         * @return np_msz - post-fisheries population size (dvar3_array)
+         * 
+         */
+        dvar3_array applyFM_Tier4(dvar3_array& M_msz , dvar3_array& n_msz, ostream& cout);
         /**
          * Calculates probabilities of surviving fisheries, given directed 
          * fishing capture rate 'dirF'.
@@ -333,6 +348,33 @@ class PopProjector{
         dvar3_array project(dvariable dirF, dvar3_array& n_msz, ostream& cout);
         
         /**
+         * Project single-sex population abundance forward one year.
+         * Tier4 HCR assumptions.
+         * based on single-sex population abundance on July 1. 
+         * 
+         * NOTE: Must set dtF and dtM prior to calling this method.
+         * 
+         * NOTE: If dirF &lt 0, then directed fishing mortality is not rescaled.
+         * NOTE: Recruitment is NOT added in.
+         * 
+         * Also calculates:
+         *      matBio - mature biomass at mating time
+         *      pCI elements:
+         *          cm_msz  - total fishing mortality        (abundance)
+         *          cp_fmsz - fishery captures, by fishery   (abundance)
+         *          rm_fmsz - retained mortality, by fishery (abundance)
+         *          dm_fmsz - discard mortality, by fishery  (abundance)
+         * 
+         * @param dirF - multiplier on fishing mortality rate in directed fishery
+         * @param M_msz - size-specific M for applyFM_Tier4
+         * @param n_msz - initial abundance
+         * @param cout - output stream for debug info
+         * 
+         * @return final sex-specific abundance, WITHOUT RECRUITMENT
+         */
+        dvar3_array project_Tier4(dvariable dirF, dvar3_array& M_msz, dvar3_array& n_msz, ostream& cout);
+
+        /**
          * Project unfished single-sex population abundance forward one year,
          * based on single-sex population abundance on July 1. Recruitment
          * is NOT added in.
@@ -377,6 +419,21 @@ class PopProjector{
          * @return mature biomass-at-mating (1000's t)
          */
         dvariable projectMatureBiomassAtMating(dvariable dirF, dvar3_array& n_msz, ostream& cout);
+
+        /**
+         * Calculate mature biomass-at-mating based on single-sex population
+         * abundance on July 1.
+         * 
+         * NOTE: If dirF &lt 0, then directed fishing mortality is not rescaled.
+         * 
+         * @param M_msz - Fishing mortality proxy under Tier4 
+         * @param n_msz - initial abundance
+         * @param cout - output stream for debug info
+         * 
+         * @return mature biomass-at-mating (1000's t)
+         */
+        dvariable projectMatureBiomassAtMating_Tier4(dvar3_array& M_msz, dvar3_array& n_msz, ostream& cout);
+
         /**
          * Project sex-specific population abundance forward by time interval "dt", 
          * applying only natural mortality.

@@ -450,6 +450,11 @@ void ModelOptions::read(cifstream & is) {
     
     //MSE-related options
     cout<<"#MSE-related options"<<endl;
+    // Federal Tier level
+    cout<<"#Tier level option (3 or 4)"<<endl;
+    is>>Tier;
+    cout<<Tier<<tb<<"#Tier Level scenario"<<endl;
+    // State HCR
     is>>HCR;
     cout<<HCR<<tb<<"#harvest control rule scenario"<<endl;
     int tst = 1;
@@ -488,7 +493,7 @@ void ModelOptions::read(cifstream & is) {
            cout<<HCR_avgMinYr<<tb<<HCR_avgMaxYr<<tb<<"#min, max years for averaging"<<endl;
            if (HCR_avgMaxYr==-1) HCR_avgMaxYr = ptrMC->mxYr;
             
-        } else if (str=="HRC3"){
+        } else if (str=="HCR3"){
             cout<<"#--options for "<<str<<endl;
             //cout<<tb<<tb<<"#HCR3"<<endl; 
             is>>HCR3_buffer;
@@ -524,7 +529,6 @@ void ModelOptions::read(cifstream & is) {
            if (HCR_avgMaxYr==-1) HCR_avgMaxYr = ptrMC->mxYr;
         } else if (str=="HCR5"){    
            cout<<"#--options for "<<str<<endl;
-          
            is>>HCR_avgMinYr;
            is>>HCR_avgMaxYr;
            cout<<HCR_avgMinYr<<tb<<HCR_avgMaxYr<<tb<<"#min, max years for averaging"<<endl;
@@ -686,7 +690,9 @@ void ModelOptions::write(ostream & os) {
     os<<"#---------------------"<<endl<<endl;
     
     //MSE-related options
-    
+    // OFL Tier
+    os << "#----Tier selection" << endl;
+    os << Tier << tb << "# selected OFL Tier (3 or 4)" << endl;
     if (debug) cout<<"#end ModelOptions::write(ostream)"<<endl;
 }
 

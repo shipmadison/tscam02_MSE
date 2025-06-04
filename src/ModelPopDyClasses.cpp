@@ -371,6 +371,80 @@ dvar3_array CatchInfo::applyFM(dvariable dirF, dvar3_array& n_msz, ostream& cout
 }
 
 /**
+ * Tier 4 version of applyFM. Applies fishing mortality rate 'fofl' directly,
+ * assuming simplified Tier 4 rules (e.g., no scaling by maxF, possibly no bycatch).
+ * 
+ * @param proxF - directed fishery fishing mortality rate
+ * @param n_msz - pre-fisheries population size
+ * 
+ * @return np_msz - post-fisheries population size
+ * 
+ */
+dvar3_array CatchInfo::applyFM_Tier4(dvar3_array& M_msz, dvar3_array& n_msz, ostream& cout){
+    cout<<"CatchInfo::applyFM_Tier4 test"<<endl;
+    RETURN_ARRAYS_INCREMENT();
+     dvar3_array ratF_msz = M_msz; //proxy for Fmsy used in Tier 4 HCR 0.23
+    
+    dvar3_array np_msz(1,nMSs,1,nSCs,1,nZBs);
+    np_msz.initialize();//number surviving fisheries
+   
+    rmF_fmsz.initialize();//retained catch mortality rates
+    dmF_fmsz.initialize();//discards catch mortality rates
+   
+    cmN_msz.initialize();//total catch mortality (abundance)
+    cpN_fmsz.initialize();//capture abundance, by fishery
+    rmN_fmsz.initialize();//retained catch mortality (abundance)
+    dmN_fmsz.initialize();//discards catch mortality (abundance)
+    for (int s=1;s<=nSCs;s++){
+        for (int m=1;m<=nMSs;m++){ 
+            totFM.initialize();
+
+            if ((sex == MALE) && (m == MATURE)){
+                //Set rmF = 1.0 for mature males in legal size bins in the directed fishery (f = 1)
+                for (int z=20; z<=nZBs; z++) { // Check if this is legal animals
+                    rmF_fmsz(1,MATURE,s,z) = 1.0; // this may work as rmF_fmsz(1,MATURE, s, z)
+                }
+             }
+            
+            //directed fishery
+            //rmF_fmsz(1,m,s) = elem_prod(retF_fmsz(1,m,s),              ratF*cpF_fmsz(1,m,s));
+            //dmF_fmsz(1,m,s) = elem_prod(hm_f(1)*(1.0-retF_fmsz(1,m,s)),ratF*cpF_fmsz(1,m,s));
+            totFM += rmF_fmsz(1,m,s)+dmF_fmsz(1,m,s);
+            //bycatch fisheries
+            for (int f=2;f<=nFsh;f++){
+                rmF_fmsz(f,m,s) = elem_prod(retF_fmsz(f,m,s),              cpF_fmsz(f,m,s));
+                dmF_fmsz(f,m,s) = elem_prod(hm_f(f)*(1.0-retF_fmsz(f,m,s)),cpF_fmsz(f,m,s));
+                totFM += rmF_fmsz(f,m,s)+dmF_fmsz(f,m,s);
+            }
+            
+            np_msz(m,s) = elem_prod(mfexp(-totFM),n_msz(m,s));//survival after all fisheries
+            cmN_msz(m,s) = n_msz(m,s)-np_msz(m,s);             //total catch mortality, all fisheries
+            
+            //total capture abundance, directed fishery
+            cpN_fmsz(1,m,s) = elem_prod(elem_div(elem_prod(ratF_msz(m,s),cpF_fmsz(1,m,s)),totFM),cmN_msz(m,s));
+            //retained catch mortality (abundance), directed fishery
+            rmN_fmsz(1,m,s) = elem_prod(elem_div(rmF_fmsz(1,m,s),totFM),cmN_msz(m,s));
+            //discard catch mortality (abundance), directed fishery
+            dmN_fmsz(1,m,s) = elem_prod(elem_div(dmF_fmsz(1,m,s),totFM),cmN_msz(m,s));
+            //bycatch fisheries
+            for (int f=2;f<=nFsh;f++){
+                //total capture abundance
+                cpN_fmsz(f,m,s) = elem_prod(elem_div(cpF_fmsz(f,m,s),totFM),cmN_msz(m,s));
+                //retained catch mortality (abundance)
+                rmN_fmsz(f,m,s) = elem_prod(elem_div(rmF_fmsz(f,m,s),totFM),cmN_msz(m,s));
+                //discard catch mortality (abundance)
+                dmN_fmsz(f,m,s) = elem_prod(elem_div(dmF_fmsz(f,m,s),totFM),cmN_msz(m,s));
+            }//f
+        }//m
+    }//s
+    if (debug) {
+        cout<<"#--np_msz = "<<&np_msz<<endl;
+    }
+    if (debug) cout<<"finished CatchInfo::applyFM_Tier4(dvar3_array M_msz, dvar3_array n_msz)"<<endl;
+    RETURN_ARRAYS_DECREMENT();
+    return np_msz;
+}
+/**
  * Calculates probabilities of surviving fisheries, given directed 
  * fishing capture rate 'dirF'.
  * 
@@ -620,7 +694,112 @@ dvar3_array PopProjector::project(dvariable dirF, dvar3_array& n_msz, ostream& c
     RETURN_ARRAYS_DECREMENT();
     return 1.0*n5_msz;
 }
-
+/**
+ * Project sex-specific component of population ahead one year, WITHOUT recruitment.
+ * Edited for Tier 4 HCR 
+ * NOTE: If dirF &lt 0, then directed fishing mortality is not rescaled.
+ * 
+ * Also calculates:
+ *      matBio - spawning biomass at mating time
+ *      pCI elements:
+ *          rmF_fmsz - retained mortality rate, by fishery
+ *          dmF_fmsz - discard mortality rate, by fishery 
+ *          cmN_msz - total fishing mortality          (abundance)
+ *          cpN_fmsz - fishery captures, by fishery    (abundance)
+ *          rmN_fmsz - retained mortality, by fishery  (abundance)
+ *          dmN_fmsz - discard mortality, by fishery   (abundance)
+ * 
+ * @param n_msz - initial numbers-at-maturity state/shell condition/size
+ * @param dirF - multiplier on fishing mortality rate in directed fishery
+ * @param M_msz - size-specific natural Mortality used in applyFM_Tier4
+ * 
+ * @return final numbers-at-maturity state/shell condition/size, WITHOUT recruitment
+ */
+dvar3_array PopProjector::project_Tier4(dvariable dirF, dvar3_array& M_msz, dvar3_array& n_msz, ostream& cout){
+    if (debug) cout<<"starting PopProjector::project(dirF, n_msz)"<<endl;
+    RETURN_ARRAYS_INCREMENT();
+    n1_msz.initialize();
+    n2_msz.initialize();
+    n3_msz.initialize();
+    n4_msz.initialize();
+    n5_msz.initialize();
+    //if (debug){PopDyInfo::debug=1; CatchInfo::debug=1;}
+    if (dtF<=dtM){ //fisheries occur BEFORE molting/growth/maturity 
+        if (debug) cout<<"dtF(<=dtM) = "<<dtF<<endl;
+        //apply natural mortality BEFORE fisheries
+        n1_msz = pPI->applyNM(dtF, n_msz,cout);
+        //if (debug) cout<<1<<endl;
+        //apply fisheries
+        n2_msz = pCI->applyFM_Tier4(M_msz, n1_msz,cout);
+        //if (debug) cout<<2<<endl;
+        //apply natural mortality after fisheries but before molting/growth
+        if (dtF==dtM){
+            n3_msz = n2_msz;
+            //if (debug) cout<<3<<endl;
+        } else {
+            n3_msz = pPI->applyNM(dtM-dtF, n2_msz,cout);
+            //if (debug) cout<<4<<endl;
+        }        
+        //apply molting/growth
+        n4_msz = pPI->applyMG(n3_msz,cout);
+        //if (debug) cout<<5<<endl;
+        //apply natural mortality AFTER molting/growth
+        n5_msz = pPI->applyNM(1.0-dtM, n4_msz,cout);
+        //if (debug) cout<<6<<endl;
+        
+        //calculate mature biomass-at-mating from pre-molting/growth abundance
+        matBio = pPI->calcMatureBiomass(n3_msz,cout);
+        //if (debug) cout<<7<<endl;
+    } else { //fisheries occur AFTER molting/growth/maturity 
+        if (debug) cout<<"dtM<dtF"<<endl;
+        //apply natural mortality BEFORE molting/growth
+        n1_msz = pPI->applyNM(dtM, n_msz,cout);        
+        //apply molting/growth
+        n2_msz = pPI->applyMG(n1_msz,cout);
+        //apply natural mortality after molting/growth but before fisheries
+        if (dtF==dtM){
+            n3_msz = n2_msz;
+        } else {
+            n3_msz = pPI->applyNM(dtF-dtM, n2_msz,cout);
+        }
+        //apply fisheries
+        n4_msz = pCI->applyFM_Tier4(M_msz, n3_msz,cout);
+        //apply natural mortality AFTER fisheries
+        n5_msz = pPI->applyNM(1.0-dtF, n4_msz,cout);
+        
+        //calculate mature biomass-at-mating from pre-molting/growth abundance
+        matBio = pPI->calcMatureBiomass(n1_msz,cout);
+    }
+    
+    if (debug){
+        cout<<"n_msz  = "<<&n_msz<<endl;
+        cout<<"n1_msz = "<<&n1_msz<<endl;
+        cout<<"n2_msz = "<<&n2_msz<<endl;
+        cout<<"n3_msz = "<<&n3_msz<<endl;
+        cout<<"n4_msz = "<<&n4_msz<<endl;
+        cout<<"n5_msz = "<<&n5_msz<<endl;
+        cout<<"------n0_msz = "<<endl; wts::print(n_msz, cout,1);
+        cout<<"------n1_msz = "<<endl; wts::print(n1_msz,cout,1);
+        for (int f=1;f<=nFsh;f++){
+            cout<<"----fishery = "<<f<<endl;
+            cout<<"----hmF = "<<pCI->hm_f(f)<<endl;
+            cout<<"------cpF_msz = "<<endl; wts::print(pCI->cpF_fmsz(f),cout,1);
+            cout<<"------rmF_msz = "<<endl; wts::print(pCI->rmF_fmsz(f),cout,1);
+            cout<<"------dmF_msz = "<<endl; wts::print(pCI->dmF_fmsz(f),cout,1);
+//            cout<<"------cpN_msz = "<<endl; wts::print(pCI->cpN_fmsz(f),cout,1);
+//            cout<<"------rmN_msz = "<<endl; wts::print(pCI->rmN_fmsz(f),cout,1);
+//            cout<<"------dmN_msz = "<<endl; wts::print(pCI->dmN_fmsz(f),cout,1);
+        }//f
+        cout<<"------n2_msz = "<<endl; wts::print(n2_msz,cout,1);
+        cout<<"------n3_msz = "<<endl; wts::print(n3_msz,cout,1);
+        cout<<"------n4_msz = "<<endl; wts::print(n4_msz,cout,1);
+        cout<<"------n5_msz = "<<endl; wts::print(n5_msz,cout,1);
+    }
+//    if (debug){PopDyInfo::debug=0; CatchInfo::debug=0;}
+    if (debug) cout<<"finished PopProjector::project_Tier4(dirF, M_msz, n_msz)"<<endl;   
+    RETURN_ARRAYS_DECREMENT();
+    return 1.0*n5_msz;
+}
 /**
  * Project unfished single-sex population abundance forward one year,
  * based on single-sex population abundance on July 1. Recruitment
@@ -739,6 +918,60 @@ dvariable PopProjector::projectMatureBiomassAtMating(dvariable dirF, dvar3_array
     if (debug) {
         cout<<"matBio = "<<matBio<<endl;
         cout<<"finished PopProjector::projectMatureBiomassAtMating(dirF, n_msz)"<<endl;   
+    }
+    RETURN_ARRAYS_DECREMENT();
+    return matBio;
+}
+/**
+ * Calculate mature biomass-at-mating by projecting population forward to mating time using Tier4 assumptions.
+ *  - Tier 4 assumptions uses the applyFM_Tier4 
+ * 
+ * NOTE: If dirF &lt 0, then directed fishing mortality is not rescaled.
+ * 
+ * @param n_msz - initial (July 1) numbers-at-maturity state/shell condition/size
+ * 
+ * @return MMB-at-mating
+ */
+dvariable PopProjector::projectMatureBiomassAtMating_Tier4(dvar3_array& M_msz, dvar3_array& n_msz, ostream& cout){
+    if (debug) cout<<"starting PopProjector::projectMatureBiomassAtMating_Tier4(M_msz, n_msz)"<<endl;
+    RETURN_ARRAYS_INCREMENT();
+    if (debug) cout<<"dtF = "<<dtF<<"; dtM = "<<dtM<<endl;
+    n1_msz.initialize();
+    if (dtF<=dtM){ //fisheries occur BEFORE molting/growth/maturity 
+        n2_msz.initialize();
+        n3_msz.initialize();
+        if (debug) cout<<"dtF<=dtM"<<endl;
+        //apply natural mortality BEFORE fisheries
+        n1_msz = pPI->applyNM(dtF,n_msz, cout);
+        if (debug) {cout<<"n1_msz ="<<endl; wts::print(n1_msz,cout,1);}
+        //apply fisheries
+        n2_msz = pCI->applyFM_Tier4(M_msz, n1_msz, cout); // changed this for Tier4 FM application
+        if (debug) {cout<<"n2_msz ="<<endl; wts::print(n2_msz,cout,1);}
+        //apply natural mortality after fisheries but before molting/growth
+        if (dtF==dtM){
+            if (debug) cout<<"dtF=dtM"<<endl;
+            n3_msz = n2_msz;
+        } else {
+            if (debug) cout<<"dtF<dtM"<<endl;
+            n3_msz = pPI->applyNM(dtM-dtF,n2_msz,cout);
+        }
+        if (debug) {cout<<"n3_msz ="<<endl; wts::print(n3_msz,cout,1);}
+        
+        //calculate mature biomass at mating
+        matBio = pPI->calcMatureBiomass(n3_msz,cout);
+    } else { //fisheries occur AFTER molting/growth/maturity 
+        if (debug) cout<<"dtF>dtM"<<endl;
+        //apply natural mortality BEFORE molting/growth
+        n1_msz = pPI->applyNM(dtM,n_msz,cout);
+        if (debug) {cout<<"n1_msz ="<<endl; wts::print(n1_msz,cout,1);}
+        
+        //calculate mature biomass at mating
+        matBio = pPI->calcMatureBiomass(n1_msz,cout);
+    }
+    
+    if (debug) {
+        cout<<"matBio = "<<matBio<<endl;
+        cout<<"finished PopProjector::projectMatureBiomassAtMating_Tier4(M_msz, n_msz)"<<endl;   
     }
     RETURN_ARRAYS_DECREMENT();
     return matBio;

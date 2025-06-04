@@ -11,9 +11,9 @@ using namespace tcsam;
 /** flags to print debug info */
 int Equilibrium_Calculator::debug = 0;
 int Tier3_Calculator::debug = 0;
-int Tier4_Calculator::debug = 0;
 int OFL_Calculator::debug = 0;
-int OFLResults::debug = 0;
+int OFL_Calculator_Tier4::debug = 1;
+int OFLResults::debug = 1;
 ////////////////////////////////////////////////////////////////////////////////
 //Equilibrium_Calculator
 ////////////////////////////////////////////////////////////////////////////////
@@ -767,6 +767,252 @@ OFLResults* OFL_Calculator::calcOFLResults(dvar_vector R, dvar4_array& n_xmsz, o
     return res;
 }
 ////////////////////////////////////////////////////////////////////////////////
+//OFL_Calculator_Tier4
+////////////////////////////////////////////////////////////////////////////////
+/**
+ * Constructor.
+ * 
+ * @param pPrj - pointer to a PopProjector object for MMB
+ * @param Bmsy_prox - Proxy Bmsy, average MMB at mating from 1982 - (mxyr-1))
+ * 
+ */
+OFL_Calculator_Tier4::OFL_Calculator_Tier4(PopProjector* pPrj, dvariable Bmsy_prox){
+    //inputs
+    cout<<"OFL_Calculator_Tier 4 Start"<<endl;
+    pPrjM = pPrj; // pointer to the PopProjector class 
+    Bmsy_proxy = Bmsy_prox;
+
+    //other constants
+    M     = 0.23;   
+   // gamma = 1.0;
+    alpha = 0.1; 
+    beta  = 0.25;
+    cout<<"OFL_Calculator_Tier 4 End"<<endl;
+}
+/**
+ * Calculate Fofl using Tier 4 Harvest Control Rule (HCR).
+ * 
+ * @param currMMB - current mature male biomass
+ * @param Bmsy - proxy for Bmsy
+ * @param Fmsy - proxy for Fmsy (usually M = 0.23)
+ * @param cout - debug stream
+ * 
+ * @return Fofl
+ */
+dvariable OFL_Calculator_Tier4::calcHCR(dvariable currMMB, dvariable Bmsy, dvariable Fmsy, ostream& cout){
+    if (debug) cout<<"starting OFL_Calculator_Tier4::calcHCR(currMMB, Bmsy, Fmsy)"<<endl;
+    RETURN_ARRAYS_INCREMENT();
+    dvariable Fofl = 0.0;
+    double ratio  = value(currMMB/Bmsy);
+    if (ratio < beta) {
+        Fofl = 0.0;
+    } else if (ratio < 1.0) {
+        Fofl = Fmsy * (ratio - alpha) / (1.0 - alpha);
+    } else {
+        Fofl = Fmsy;
+    }
+    if (debug) {
+        cout<<"Fofl = "<<Fofl<<endl;
+        cout<<"finished OFL_Calculator_Tier4::calcHCR(currMMB, Bmsy, Fmsy)"<<endl;
+    }
+    RETURN_ARRAYS_DECREMENT();
+    return Fofl;
+}
+/**
+ * Calculate Fofl using the Harvest Control Rule (HCR), based on Bmsy_prox,
+ * Fmsyprox, and the initial (July 1) male abundance n_msz. This is an 
+ * iterative process because Fofl is given by the HCR based on the
+ * projected MMB, which itself depends on what the target fishery capture
+ * rate (F) was.
+ * 
+ * Also calculates prjMMB;
+ * 
+ * @param Bmsy_prox - equilibrium MMB when population fished at Fmsy
+ * @param M_msz - Fmsy proxy
+ * @param n_msz - initial (July 1) male abundance
+ * @param cout - output stream for debug info
+ * 
+ * @return Fofl
+ */
+dvariable OFL_Calculator_Tier4::calcFofl(dvariable Bmsy_prox, dvar3_array& M_msz, dvar3_array& n_msz, ostream& cout){
+    if (debug) {
+        cout<<"starting double OFL_Calculator_Tier4::calcFofl(Bmsy_prox, M_msz, n_msz)"<<endl;
+        cout<<"Bmsy_prox = "<<Bmsy_prox<<"; Fprox = "<<M_msz<<endl;
+        cout<<"n_msz = "<<endl;wts::print(n_msz,cout,1); cout<<endl;        
+    }
+    RETURN_ARRAYS_INCREMENT();
+      
+    //start with guess for Fofl based on currMMB
+    dvariable currMMB = pPrjM->projectMatureBiomassAtMating_Tier4(M_msz,n_msz,cout);
+    if (debug) cout<<"init currMMB = "<<currMMB<<"; B/Bmsy = "<<currMMB/Bmsy_prox<<endl;
+    dvariable Fofl = calcHCR(currMMB,Bmsy_prox, M,cout); // use Bmsy_prox and M (0.23) for Fmsy
+    if (debug) cout<<"init Fofl = "<<Fofl<<endl;
+    //now iterate until Fofl yields currMMB
+    dvariable Foflp = 0.0;
+    int i = 1;
+    while (i++ < maxIts){
+        if (debug&&(i==maxIts)) cout<<"HCR iteration for Fofl = "<<i<<endl;
+        //calculate currMMB based on Fofl
+        currMMB = pPrjM->projectMatureBiomassAtMating_Tier4(M_msz,n_msz,cout);
+        if (debug) cout<<"--updated prjMMB = "<<currMMB<<"; B/Bmsy = "<<currMMB/Bmsy_prox<<endl;
+        //update Fofl based on currMMB
+        Foflp = Fofl;
+        Fofl  = calcHCR(currMMB,Bmsy_prox, M,cout); // use Bmsy_prox and M (0.23) for Fmsy
+        if (debug) cout<<"--updated Fofl = "<<Fofl<<"; delF = "<<Fofl - Foflp<<endl;
+    }
+    double criF = 0.001;
+    if (sfabs(value(Fofl - Foflp))>criF){
+        cout<<endl<<"-------ERROR!!-------"<<endl;
+        cout<<"Convergence in calcFofl failed: |delF| = "<<sfabs(value(Fofl - Foflp))<<" > "<<criF<<endl;
+        cout<<"-------ERROR!!-------"<<endl<<endl;
+    }
+    prjMMB = currMMB;
+    if (debug) {
+        cout<<"Fofl   = "<<Fofl<<endl;
+        cout<<"prjMMB = "<<prjMMB<<endl;
+        cout<<"finished double OFL_Calculator_Tier4::calcFofl(Bmsy_prox, M_msz ,n_msz)"<<endl;
+    }
+    RETURN_ARRAYS_DECREMENT();
+    return Fofl;
+}
+/**
+ * Calculate the total OFL (retained+discard mortality) taken
+ * when fishing on population starting with initial abundance (July 1)
+ * n_xmsz at directed fishery capture rate of Fofl.
+ * 
+ * 
+ * @param Fofl - directed fishery capture rate
+ * @param M_msz - natural mortality array for Tier 4
+ * @param n_xmsz - initial population abundance
+ * @param cout - output stream for debug info
+ * 
+ * @return total OFL (biomass)
+ */
+dvariable OFL_Calculator_Tier4::calcOFL(dvariable Fofl, dvar3_array& M_msz, dvar4_array& n_xmsz, ostream& cout){
+    if (debug) cout<<"starting double OFL_Calculator_Tier4::calcOFL(Fofl,n_xmsz)"<<endl;
+    RETURN_ARRAYS_INCREMENT();
+    
+    int nFsh = pPrjM->nFsh;
+    if (debug) cout<<"nFsh = "<<nFsh<<endl;
+    
+    ofl_fx.allocate(0,nFsh,1,tcsam::nSXs);
+    ofl_fx.initialize();
+
+    dvariable totCM;
+    
+    // Tier 4: males only
+    // NOTE: Tier 4 OFL only calculated for MALE component
+    if (debug) cout<<"calculating OFL for MALEs"<<endl;
+    
+    //calc catch abundance of males at Fofl
+    pPrjM->project_Tier4(Fofl, M_msz, n_xmsz(  MALE),cout);
+    //calc retained catch biomass (directed fishery only) from catch abundance for males
+    ofl_fx(0,MALE) = pPrjM->pPI->calcTotalBiomass(pPrjM->pCI->rmN_fmsz(1),cout);
+    //calc discard mortality biomass from catch abundance for males
+    for (int f=1;f<=nFsh;f++){
+        ofl_fx(f,MALE) = pPrjM->pPI->calcTotalBiomass(pPrjM->pCI->dmN_fmsz(f),cout);
+    }
+    totCM = pPrjM->pPI->calcTotalBiomass(pPrjM->pCI->cmN_msz,cout);    
+    
+    
+    dvariable ofl = sum(ofl_fx);
+    if (debug||(ofl!=totCM)) {
+        cout<<"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"<<endl;
+        cout<<"in double OFL_Calculator_Tier4::calcOFL(Fofl,M_msz,n_xmsz)"<<endl;
+        cout<<"OFL   = "<<ofl<<endl;
+        cout<<"totCM = "<<totCM<<endl;
+        cout<<"ofl_fx: "<<endl<<ofl_fx<<endl;
+        cout<<"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"<<endl;
+        cout<<"finished double OFL_Calculator_Tier4::calcOFL(Fofl,M_msz,n_xmsz)"<<endl;
+    }
+    RETURN_ARRAYS_DECREMENT();
+    return ofl;
+}
+/** 
+ * Calculate the (projected) MMB when fished at Fofl.
+ * 
+ * @param Fofl - target fishery capture rate
+ * @param M_msz - natural mortality array for Tier 4
+ * @param n_msz - initial (July 1) population
+ * @param cout - output stream for debug info
+ * 
+ * @return - the (projected) MMB
+ */
+dvariable OFL_Calculator_Tier4::calcPrjMMB(dvariable Fofl, dvar3_array& M_msz, dvar3_array& n_msz, ostream& cout){
+    if (debug) {
+        cout<<"starting dvariable OFL_Calculator_Tier4::calcPrjMMB(Fofl,M_msz,n_msz)"<<endl;
+        cout<<"Fofl = "<<Fofl<<endl;
+    }
+    RETURN_ARRAYS_INCREMENT();
+    
+    dvariable mmb = pPrjM->projectMatureBiomassAtMating_Tier4(M_msz, n_msz,cout);
+    if (debug) {
+        cout<<"mmb = "<<mmb<<endl;
+        cout<<"finished dvariable OFL_Calculator_Tier4::calcPrjMMB(Fofl,M_msz,n_msz)"<<endl;
+    }
+    RETURN_ARRAYS_DECREMENT();
+    return mmb;
+}
+
+/**
+ * Calculate all results associated with the OFL.
+ * 
+ * @param R - assumed sex-specific equilibrium recruitment
+ * 
+ * @param n_xmsz - d4_array with initial population abundance
+ * @param cout - output stream for debug info
+ * @param M_msz - natural mortality array for Tier 4
+ * @return pointer to OFLResults object.
+ */
+OFLResults* OFL_Calculator_Tier4::calcOFLResults(dvar_vector R, dvar3_array& M_msz, dvar4_array& n_xmsz, ostream& cout){
+    if (debug) cout<<"starting OFL_Calculator_Tier4::calcOFLResults(R, M_msz, n_xmsz,cout)"<<endl;
+    cout<<"starting OFL_Calculator_Tier4::calcOFLResults(R, M_msz, n_xmsz, cout)"<<endl;
+    int nFsh = pPrjM->nFsh;
+    cout<<"nFsh ="<<nFsh<<endl;
+
+    OFLResults* res = new OFLResults();
+     cout<<"constructed OFLResults"<<endl;
+
+    // Set up dimensions and inputs
+    res->avgRec_x = R; // NOT USED FOR TIER4 but keep it in for simplicity 
+    res->finlNatZ_xmsz.allocate(1,tcsam::nSXs,
+                                1,tcsam::nMSs,
+                                1,tcsam::nSCs,
+                                1,pPrjM->nZBs);
+    res->finlNatZ_xmsz = n_xmsz;
+
+    res->pPDIM = pPrjM->pPI;
+    res->pCIM  = pPrjM->pCI;
+
+    // Tier 4 only uses male projections, so null these
+    res->pPDIF = 0;
+    res->pCIF  = 0;
+    
+    // Current MMB from July 1 population (males only)
+    res->curB     = pPrjM->pPI->calcMatureBiomass(n_xmsz(MALE),cout);
+    if (debug) cout<<"calcOFLResults: calculated curB"<<endl;
+        
+    // Set proxies            
+    res->Fmsy = M; // M = 0.23 class-level constant
+    res->Bmsy = Bmsy_proxy; //passed in through constructor
+    res->B0   = -1.0; // unused for Tier 4
+    res->MSY  = -1.0; // unused for Tier 4
+                
+     // Calculate Fofl using Tier 4 HCR logic
+    res->Fofl = calcFofl(Bmsy_proxy, M_msz, n_xmsz(MALE), cout);
+    if (debug) cout<<"calcOFLResults: calculated Fofl"<<endl;
+    
+    res->prjB = prjMMB; // updated during calcFofl
+    res->OFL  = calcOFL(res->Fofl, M_msz,n_xmsz,cout);
+    if (debug) cout<<"calcOFLResults: calculated OFL"<<endl;
+    
+    res->ofl_fx.allocate(0,nFsh,1,tcsam::nSXs);
+    res->ofl_fx = ofl_fx;
+    if (debug) cout<<"finished OFLResults* OFL_Calculator_Tier4::calcOFLResults(R,M_msz,n_xmsz,cout)"<<endl;
+    return res;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 //OFLResults
 ////////////////////////////////////////////////////////////////////////////////
 OFLResults::OFLResults(){
@@ -778,10 +1024,13 @@ OFLResults::OFLResults(){
 
 OFLResults::~OFLResults(){
     std::cout<<"Deleting OFLResults object."<<endl;
+    // WARNING: If these pointers are shared (not deep-copied), deleting them here may cause issues.
+    // For Tier 4, these are likely just shallow references from the OFL_Calculator.
     if (pPDIM) delete(pPDIM); pPDIM=0;
     if (pPDIF) delete(pPDIF); pPDIF=0;
     if (pCIM)  delete(pCIM);  pCIM=0;
     if (pCIF)  delete(pCIF);  pCIF=0;
+   
     std::cout<<"Deleted OFLResults object."<<endl;
 }
 
@@ -854,21 +1103,57 @@ void OFLResults::writeToCSV(ostream& os){
  * @param debug - flag to print debugging info
  */
 void OFLResults::writeToR(ostream& os, ModelConfiguration* ptrMC, adstring name, int debug){
+    cout<<"wtR1: started writeToR()"<<endl;
+
     adstring xDms = ptrMC->dimSXsToR;//sex
     adstring mDms = ptrMC->dimMSsToR;//maturity
     adstring sDms = ptrMC->dimSCsToR;//shell condition
     adstring zDms = ptrMC->dimZBsToR;//size bin midpoints
+    
     os<<name<<"=list(OFL="<<OFL<<cc<<"Fofl="<<Fofl<<cc<<"prjB="<<prjB<<cc<<"curB="<<curB;
-    os<<cc<<"Fmsy="<<Fmsy<<cc<<"Bmsy="<<Bmsy<<cc<<"MSY="<<MSY;
-    os<<cc<<"B100="<<B0<<cc<<"avgRecM="<<avgRec_x(MALE);
+    
+    // Only write Tier 3 values if available (e.g. Fmsy >0)
+    if (Fmsy > 0) os<<cc<<"Fmsy="<<Fmsy;
+    if (Bmsy > 0) os<<cc<<"Bmsy="<<Bmsy;
+    if (MSY > 0) os<<cc<<"MSY="<<MSY;
+    if (B0 > 0) os<<cc<<"B100="<<B0;
+
+    cout<<"wtR2: avgRecM"<<endl;
+    os<<cc<<"avgRecM="<<avgRec_x(MALE);
     if (tcsam::nSXs>1) os<<cc<<"avgRecF="<<avgRec_x(FEMALE);
     os<<cc<<endl;
+
+    cout<<"wtR3: finalNatZ"<<endl;
     os<<"finlNatZ_xmsz="; wts::writeToR(os,finlNatZ_xmsz,xDms,mDms,sDms,zDms); os<<cc<<endl;
-    pPDIM->writeToR(os,ptrMC,"popDyInfoM",0); os<<cc<<endl;
-    if (tcsam::nSXs>1) {pPDIF->writeToR(os,ptrMC,"popDyInfoF",0); os<<cc<<endl;}
-    pCIM->writeToR(os,ptrMC,"catchInfoM",0); os<<cc<<endl;
-    if (tcsam::nSXs>1) {pCIF->writeToR(os,ptrMC,"catchInfoF",0); os<<cc<<endl;}
-    os<<"eqNatZF0_xmsz="; wts::writeToR(os,eqNatZF0_xmsz,xDms,mDms,sDms,zDms); os<<cc<<endl; 
-    os<<"eqNatZFM_xmsz="; wts::writeToR(os,eqNatZFM_xmsz,xDms,mDms,sDms,zDms); os<<endl;
+    
+    cout<<"wtR4: pPDIM"<<endl;
+    if(pPDIM) {
+        pPDIM->writeToR(os,ptrMC,"popDyInfoM",0); os<<cc<<endl;
+    }
+    cout<<"wtR5: pPDIF"<<endl;
+    if ((tcsam::nSXs>1) && (pPDIF)) {
+        pPDIF->writeToR(os,ptrMC,"popDyInfoF",0); os<<cc<<endl;
+    }
+    cout<<"wtR6: pCIM"<<endl;
+    if(pCIM) {
+        pCIM->writeToR(os,ptrMC,"catchInfoM",0); os<<cc<<endl;
+    }
+    cout<<"wtR7: pCIF"<<endl;
+    if ((tcsam::nSXs > 1) && (pCIF)) {
+        pCIF->writeToR(os,ptrMC,"catchInfoF",0); os<<cc<<endl;
+    }
+    cout<<"wtR8: eqNatZF0_xmsz"<<endl;
+    if (allocated(eqNatZF0_xmsz)) {
+        os << "eqNatZF0_xmsz=";
+        wts::writeToR(os, eqNatZF0_xmsz, xDms, mDms, sDms, zDms);
+        os << cc << endl;
+    }
+    cout<<"wtR9: eqNatZFM_xmsz"<<endl;
+    if (allocated(eqNatZFM_xmsz)) {
+        os << "eqNatZFM_xmsz=";
+        wts::writeToR(os, eqNatZFM_xmsz, xDms, mDms, sDms, zDms);
+        os << endl;
+    }
+    cout<<"wtR10: finished writeToR()"<<endl;
     os<<")";
 }
