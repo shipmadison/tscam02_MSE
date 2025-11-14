@@ -454,6 +454,10 @@ void ModelOptions::read(cifstream & is) {
     cout<<"#Tier level option (3 or 4)"<<endl;
     is>>Tier;
     cout<<Tier<<tb<<"#Tier Level scenario"<<endl;
+    // Shortcut Methods
+    cout<<"#Shortcut EM (0 or 1)"<<endl;
+    is>>Shortcut;
+    cout<<Shortcut<<tb<<"#Tier Level scenario"<<endl;
     // State HCR
     is>>HCR;
     cout<<HCR<<tb<<"#harvest control rule scenario"<<endl;
@@ -693,6 +697,7 @@ void ModelOptions::write(ostream & os) {
     // OFL Tier
     os << "#----Tier selection" << endl;
     os << Tier << tb << "# selected OFL Tier (3 or 4)" << endl;
+    os << Shortcut << tb << "# Shortcut EM method (0 or 1)" << endl;
     if (debug) cout<<"#end ModelOptions::write(ostream)"<<endl;
 }
 

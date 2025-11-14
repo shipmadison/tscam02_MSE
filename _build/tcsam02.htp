@@ -410,6 +410,7 @@ private:
   param_4array prj_retF_fmsz;
   param_4array prj_selF_fmsz;
   param_vector prj_spB_x;
+  param_vector prj_MspB_y;
   param_4array prj_n_xmsz;
   param_5array prj_cpN_fxmsz;
   param_5array prj_rmN_fxmsz;
@@ -475,6 +476,8 @@ public:
  dvar3_array calcEqNatZ(dvar_vector& R_z,dvar3_array& S1_msz, dvar_matrix& Th_sz, dvar3_array& T_szz, dvar3_array& S2_msz, int debug, ostream& cout);
  d5_array calcCohortProgression(int yr, int debug, ostream& cout);
  void calcOFL(int yr, int debug, ostream& cout);
+ dvariable calcProxyBmsy_Shortcut(dvector MMB_survey, dvector DirCatch, dvar3_array& M_msz, double dtM, int yr, ostream& cout);
+ void calcOFL_Shortcut(int yr, int debug, ostream& cout);
  void calcOFL_OpMod(int debug, ostream& cout);
  void calcPenalties(int debug, ostream& cout);
  void calcDevsPenalties(int debug, ostream& cout, double penWgt, param_init_bounded_vector_vector& pDevs, dvar_matrix devs);
@@ -539,8 +542,15 @@ public:
  void calcDynB0(int debug, ostream& cout);
  void writeStateForOpMod(int y,ostream& os);
  void writeEstModPinFile(int closed, ostream& os);
+ double getMMB(int shortcut_switch);
+ double getAveMMB(int shortcut_switch);
+ double getMFB(int shortcut_switch, FleetData* ptrSurvey);
+ double getAveMFB(int shortcut_switch, FleetData* ptrSurvey);
+ dvector getELMA(int shortcut_switch, FleetData* ptrSurvey);
+ double getELMB(int shortcut_switch, FleetData* ptrSurvey);
  int calcTAC(int hcr, double OFL);
  double repTAC(int hcr, double OFL);
+ double repTAC_uncapped(int hcr, double OFL);
  int calcTAC_OpMod(int hcr, double OFL);
  double repTAC_OpMod(int hcr, double OFL);
   void finishOpModMode(void);

@@ -286,6 +286,8 @@ class EffXtrapScenarios{
         adstring_array optsMSE;
         /** Federal OFL Tier to use */
         int Tier;
+        /** Shortcut Method */
+        int Shortcut;
         /** harvest control rule to use */
         int HCR; 
         /** min year for averaging in HCR 1*/

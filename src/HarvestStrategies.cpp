@@ -15,7 +15,7 @@
 
 using namespace std;
 
-int HarvestStrategies::debug = 1;
+int HarvestStrategies::debug = 0;
 const double HarvestStrategies::MMB_AveMilLb =  24; //dummy values for testing
 const double HarvestStrategies::MFB_AveMilLb = 12; // dummy values for testing 
 const double HarvestStrategies::z = 4; // dummy values for testing, number of ELM size classes 
@@ -73,7 +73,7 @@ double HarvestStrategies::HCR2_MaleRamp(double MMB, double aveMMB, int rampID){
 }
 
 /**
- HCR 22. Male only rule with Survey Estimated Biomass. Mid Ramp. 
+ HCR 22. Male only rule with Survey Biomass. Mid Ramp. 
  * 
  * @param MMB Mature Male Biomass in millions of lbs for the year SURVEY ESTIMATE
  * @param aveMMB constant, MMB average from 1982-2016

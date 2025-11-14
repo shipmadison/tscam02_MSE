@@ -247,6 +247,8 @@ class OFLResults {
         dvariable prjB;
         /** "current" MMB at beginning of projection year */
         dvariable curB;
+        /** spawning biomass time series (1975-present) from survey estimates only, after removing dirCatch and M */
+        dvar_vector MMB_spawn;
         /** "final" size distribution from assessment model */
         dvar4_array finlNatZ_xmsz; 
         /** unfished equilibrium size distribution */
@@ -443,6 +445,7 @@ class OFL_Calculator_Tier4{
         double alpha; //HCR intercept on (B/Bmsy) axis
         double beta;  //(B/Bmsy) limit below which the directed fishery is closed
         dvariable Bmsy_proxy;  ///< proxy Bmsy: average MMB at mating from 1982–yr-1
+        int shortcut_switch; //switch to turn on shortcut dynamics
 
     public:
         dvariable prjMMB;  //projected ("current") MMB when OFL is taken
@@ -457,8 +460,9 @@ class OFL_Calculator_Tier4{
          * 
          * @param pPrj - pointer to PopProjector object
          * @param Bmsy_prox - proxy for Bmsy (average historical MMB)
+         * @param shortcut - switch for shortcut estimation method
          */
-        OFL_Calculator_Tier4(PopProjector* pPrj, dvariable Bmsy_prox);
+        OFL_Calculator_Tier4(PopProjector* pPrj, dvariable Bmsy_prox, int shortcut);
         
         /**
          * Calculate Fofl using the Harvest Control Rule (HCR).
@@ -506,6 +510,24 @@ class OFL_Calculator_Tier4{
          * @return - the (projected) MMB
          */
         dvariable calcPrjMMB(dvariable Fofl, dvar3_array& M_msz, dvar3_array& n_msz, ostream& cout);
+        
+        // //
+        // /**
+        //  * Calculate a proxy for Bmsy to be used for the shortcut estimation method.
+        //  * This method takes in biomass, removes catches, and applies natural mortality
+        //  * to the time of mating (spawning biomass), then averages from 1975-present
+        //  * 
+        //  * @param MMB_survey - time series of raw MMB at the time of survey (July 1)
+        //  * @param DirCatch - time series of directed harvest
+        //  * @param M_msz - Fishing mortality proxy under Tier4 
+        //  * @param dtM - Time to mating
+        //  * @param yr - current year
+        //  * @param cout - output stream for debug info
+        //  * 
+        //  * @return Average of MMB at time of mating (1000's t)
+        //  */
+        // dvariable calcProxyBmsy_Shortcut(dvector MMB_survey, dvector DirCatch, dvar3_array& M_msz, double dtM, int yr, ostream& cout);
+
         /**
          * Calculate all results associated with the OFL.
          * 
