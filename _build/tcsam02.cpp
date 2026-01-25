@@ -1831,9 +1831,6 @@ void model_parameters::userfunction(void)
             // SHORTCUT: Skip all parameter estimation
             cout << "SHORTCUT MODE: Bypassing parameter estimation" << endl;
             objFun = 0.0;  // Constant objective function
-            // Don't run population model
-            // Don't calculate likelihoods
-            // Optimizer will stop immediately (1 iteration)
         } else {
             // STANDARD: Full estimation
             if (!runAlt) runPopDyMod(0,cout); else runAltPopDyMod(0,cout);
@@ -8040,47 +8037,96 @@ dvector model_parameters::getELMA(int shortcut_switch, FleetData* ptrSurvey)
         SizeFrequencyData* ptrSurveyZFD = ptrSurvey->ptrICD->ptrZFD;
         int most_recent_year_idx = ptrSurveyZFD->yrs.size();
         // Get total abundance by shell condition
-        double newshell = 0.0;
-        double total = 0.0;
-        dvector abund_total(20, 32);
-        abund_total.initialize();
+        //double newshell = 0.0;
+        //double total = 0.0;
+        //dvector abund_total(20, 32);
+        //abund_total.initialize();
         for (int s = 1; s <= nSCs; s++) {
             dvector n_z = ptrSurveyZFD->NatZ_xmsyz(MALE, MATURE, s, most_recent_year_idx);
-            abund_total += n_z(20, 32);
-            total += sum(n_z(20, 32));
-            if (s == NEW_SHELL) {
-                newshell = sum(n_z(20, 32));
-            }
+            abundELM += n_z(20, 32);
+            //abund_total += n_z(20, 32);
+            //total += sum(n_z(20, 32));
+            //if (s == NEW_SHELL) {
+            //    newshell = sum(n_z(20, 32));
+            //}
         }
-        double propNS = newshell / total;
+        //double propNS = newshell / total;
         // Apply shell selectivity
-        abundELM = (propNS * abund_total) + (sOS * (1 - propNS) * abund_total);
+        //abundELM = (propNS * abund_total) + (sOS * (1 - propNS) * abund_total);
         if (debug) {
-            PRINT2B2("propNS=", propNS);
-            PRINT2B2("sOS=", sOS);
+            //PRINT2B2("propNS=", propNS);
+            //PRINT2B2("sOS=", sOS);
             PRINT2B2("abundELM (shortcut)=", abundELM);
         }
     } else {
         // FULL EM: Use model population
         PRINT2B1("== Calculating ELM abundance from model ==");
-        double newshell = value(sum(n_yxmsz(mxYr, MALE, MATURE, NEW_SHELL)(20, 32)));
-        double total = 0.0;
-        dvector abund_total(20, 32);
-        abund_total.initialize();
+        //double newshell = value(sum(n_yxmsz(mxYr, MALE, MATURE, NEW_SHELL)(20, 32)));
+        //double total = 0.0;
+        //dvector abund_total(20, 32);
+        //abund_total.initialize();
         for (int s = 1; s <= nSCs; s++) {
-            abund_total += value(n_yxmsz(mxYr, MALE, MATURE, s)(20, 32));
-            total += value(sum(n_yxmsz(mxYr, MALE, MATURE, s)(20, 32)));
+            abundELM += value(n_yxmsz(mxYr, MALE, MATURE, s)(20, 32));
+            //abund_total += value(n_yxmsz(mxYr, MALE, MATURE, s)(20, 32));
+            //total += value(sum(n_yxmsz(mxYr, MALE, MATURE, s)(20, 32)));
         }
-        double propNS = newshell / total;
+        //double propNS = newshell / total;
         // Apply shell selectivity
-        abundELM = (propNS * abund_total) + (sOS * (1 - propNS) * abund_total);
+        //abundELM = (propNS * abund_total) + (sOS * (1 - propNS) * abund_total);
         if (debug) {
-            PRINT2B2("propNS=", propNS);
-            PRINT2B2("sOS=", sOS);
+            //PRINT2B2("propNS=", propNS);
+            //("sOS=", sOS);
             PRINT2B2("abundELM (model)=", abundELM);
         }
     }
     return abundELM;
+}
+
+double model_parameters::getELMB_State(int shortcut_switch, FleetData* ptrSurvey)
+{
+    int debug = 0;
+    // Get raw ELM abundance (no selectivity)
+    dvector abundELM = getELMA(shortcut_switch, ptrSurvey);
+    // Get weights
+    dvector weights = ptrMDS->ptrBio->wAtZ_xmz(MALE, MATURE);
+    // Calculate proportion new shell
+    double newshell, total, propNS;
+    if (shortcut_switch == 1) {
+        // Shortcut: use survey data
+        SizeFrequencyData* ptrSurveyZFD = ptrSurvey->ptrICD->ptrZFD;
+        int most_recent_year_idx = ptrSurveyZFD->yrs.size();
+        newshell = 0.0;
+        total = 0.0;
+        for (int s = 1; s <= nSCs; s++) {
+            dvector n_z = ptrSurveyZFD->NatZ_xmsyz(MALE, MATURE, s, most_recent_year_idx);
+            double sum_z = sum(n_z(20, 32));
+            total += sum_z;
+            if (s == NEW_SHELL) {
+                newshell = sum_z;
+            }
+        }
+    } else {
+        // Model-based
+        newshell = value(sum(n_yxmsz(mxYr, MALE, MATURE, NEW_SHELL)(20, 32)));
+        total = 0.0;
+        for (int s = 1; s <= nSCs; s++) {
+            total += value(sum(n_yxmsz(mxYr, MALE, MATURE, s)(20, 32)));
+        }
+    }
+    propNS = newshell / total;
+    double sOS = 0.40;  // Old shell selectivity
+    // Apply shell selectivity
+    dvector ELM_State = (propNS * abundELM) + (sOS * (1 - propNS) * abundELM);
+    // Calculate biomass
+    double ELMB_State = 0.0;
+    for (int z = 20; z <= 32; z++) {
+        ELMB_State += ELM_State(z) * weights(z);
+    }
+    if (debug) {
+        PRINT2B2("propNS=", propNS);
+        PRINT2B2("ELMB_State=", ELMB_State);
+    }
+    return ELMB_State;
 }
 
 double model_parameters::getELMB(int shortcut_switch, FleetData* ptrSurvey)

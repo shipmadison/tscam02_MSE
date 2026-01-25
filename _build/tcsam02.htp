@@ -547,6 +547,7 @@ public:
  double getMFB(int shortcut_switch, FleetData* ptrSurvey);
  double getAveMFB(int shortcut_switch, FleetData* ptrSurvey);
  dvector getELMA(int shortcut_switch, FleetData* ptrSurvey);
+ double getELMB_State(int shortcut_switch, FleetData* ptrSurvey);
  double getELMB(int shortcut_switch, FleetData* ptrSurvey);
  int calcTAC(int hcr, double OFL);
  double repTAC(int hcr, double OFL);
