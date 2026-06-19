@@ -774,15 +774,16 @@ OFLResults* OFL_Calculator::calcOFLResults(dvar_vector R, dvar4_array& n_xmsz, o
  * 
  * @param pPrj - pointer to a PopProjector object for MMB
  * @param Bmsy_prox - Proxy Bmsy, average MMB at mating from 1982 - (mxyr-1))
- * 
+ * @param shortcut - shortcut switch turned on or off
+ * @param HCRgamma - scaler for Fmsy
  */
-OFL_Calculator_Tier4::OFL_Calculator_Tier4(PopProjector* pPrj, dvariable Bmsy_prox, int shortcut){
+OFL_Calculator_Tier4::OFL_Calculator_Tier4(PopProjector* pPrj, dvariable Bmsy_prox, int shortcut, double HCRgamma){
     //inputs
     //cout<<"OFL_Calculator_Tier 4 Start"<<endl;
     pPrjM = pPrj; // pointer to the PopProjector class 
     Bmsy_proxy = Bmsy_prox;
     shortcut_switch = shortcut; // switch for shortcut methods
-
+    this->HCRgamma = HCRgamma; 
     //other constants
     //M     = 0.23;  // Check this  
     // gamma = 1.0;
@@ -795,12 +796,13 @@ OFL_Calculator_Tier4::OFL_Calculator_Tier4(PopProjector* pPrj, dvariable Bmsy_pr
  * 
  * @param currMMB - current mature male biomass
  * @param Bmsy - proxy for Bmsy
- * @param Fmsy - proxy for Fmsy (usually M = 0.23)
+ * @param Fmsy - proxy for Fmsy (natural M, typically around ~0.23)
+ * @param HCRgamma - gamma scaling parameter for Tier 4 Fmsy calculation
  * @param cout - debug stream
  * 
  * @return Fofl
  */
-dvariable OFL_Calculator_Tier4::calcHCR(dvariable currMMB, dvariable Bmsy, dvariable Fmsy, ostream& cout){
+dvariable OFL_Calculator_Tier4::calcHCR(dvariable currMMB, dvariable Bmsy, dvariable Fmsy, double HCRgamma, ostream& cout){
     if (debug) cout<<"starting OFL_Calculator_Tier4::calcHCR(currMMB, Bmsy, Fmsy)"<<endl;
     RETURN_ARRAYS_INCREMENT();
     dvariable Fofl = 0.0;
@@ -808,15 +810,15 @@ dvariable OFL_Calculator_Tier4::calcHCR(dvariable currMMB, dvariable Bmsy, dvari
 
    if(debug){
     cout << "DEBUG calcHCR: currMMB=" << currMMB << ", Bmsy=" << Bmsy << ", ratio=" << ratio << ", Fmsy=" << Fmsy << endl;
-    cout << "alpha=" << alpha << ", beta=" << beta << endl;
+    cout << "alpha=" << alpha << ", beta=" << beta << ", HCRgamma=" << HCRgamma << endl;
    }
 
     if (ratio < beta) {
         Fofl = 0.0;
     } else if (ratio < 1.0) {
-        Fofl = Fmsy * (ratio - alpha) / (1.0 - alpha);
+        Fofl = (HCRgamma*Fmsy) * (ratio - alpha) / (1.0 - alpha);
     } else {
-        Fofl = Fmsy;
+        Fofl = HCRgamma*Fmsy;
     }
     if (debug) {
         cout<<"Fofl = "<<Fofl<<endl;
@@ -860,7 +862,7 @@ dvariable OFL_Calculator_Tier4::calcFofl(dvariable Bmsy_prox, dvar3_array& M_msz
     currMMB = pPrjM->projectMatureBiomassAtMating_Tier4(F_init, M_msz,n_msz,cout);
         //cout<<"currMMB = "<<currMMB<<endl;
     if (debug) cout<<"init currMMB = "<<currMMB<<"; B/Bmsy = "<<currMMB/Bmsy_prox<<endl;
-        Fofl = calcHCR(currMMB,Bmsy_prox, F_init, cout); // use Bmsy_prox and M for Fmsy
+        Fofl = calcHCR(currMMB,Bmsy_prox, F_init, HCRgamma, cout); // use Bmsy_prox and M for Fmsy
     if (debug) cout<<"init Fofl = "<<Fofl<<endl;
     //now iterate until Fofl yields currMMB
     dvariable Foflp = 0.0;
@@ -872,7 +874,7 @@ dvariable OFL_Calculator_Tier4::calcFofl(dvariable Bmsy_prox, dvar3_array& M_msz
         if (debug) cout<<"--updated prjMMB = "<<currMMB<<"; B/Bmsy = "<<currMMB/Bmsy_prox<<endl;
         //update Fofl based on currMMB
         Foflp = Fofl;
-        Fofl  = calcHCR(currMMB,Bmsy_prox, F_init,cout); // use Bmsy_prox and M (0.23) for Fmsy
+        Fofl  = calcHCR(currMMB,Bmsy_prox, F_init, HCRgamma, cout); // use Bmsy_prox and M (0.23) for Fmsy
         if (debug) cout<<"--updated Fofl = "<<Fofl<<"; delF = "<<Fofl - Foflp<<endl;
     }
     double criF = 0.001;

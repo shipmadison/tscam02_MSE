@@ -286,6 +286,8 @@ class EffXtrapScenarios{
         adstring_array optsMSE;
         /** Federal OFL Tier to use */
         int Tier;
+        /** gamma scaler for Fmsy Tier 4*/
+        double HCRgamma;
         /** Shortcut Method */
         int Shortcut;
         /** harvest control rule to use */

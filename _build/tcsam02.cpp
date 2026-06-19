@@ -3745,6 +3745,7 @@ void model_parameters::calcOFL(int yr, int debug, ostream& cout)
     //9. Determine TIER LEVEL, define Tier_Calculators, calculate OFL
     int tier = ptrMOs->Tier;
     int shortcut = ptrMOs->Shortcut;
+    double HCRgamma = ptrMOs -> HCRgamma; 
     PRINT2B2("Shortcut=", shortcut); 
     //int tier = 4;
         if (tier==3){
@@ -3792,7 +3793,7 @@ void model_parameters::calcOFL(int yr, int debug, ostream& cout)
             //PRINT2B2("BmsyProx_estmod=", BmsyProx);
             // 2. Create Tier 4 OFL Calculator
             //PRINT2B2("pPPM=", pPPM);
-            OFL_Calculator_Tier4* pOC4 = new OFL_Calculator_Tier4(pPPM, BmsyProx, shortcut); // add Shortcut variable
+            OFL_Calculator_Tier4* pOC4 = new OFL_Calculator_Tier4(pPPM, BmsyProx, shortcut, HCRgamma); // add Shortcut variable and gamma input
             if (debug) {
                 PRINT2B1("Past OFL_Calc");
                 cout<<"created pOC4."<<endl;
@@ -3921,6 +3922,7 @@ void model_parameters::calcOFL_Shortcut(int yr, int debug, ostream& cout)
         cout << "Entering calcOFL for Tier = " << ptrMOs->Tier << endl;
     }
      int tier = ptrMOs->Tier;
+     double HCRgamma = ptrMOs->HCRgamma;
      int shortcut = ptrMOs->Shortcut;
      if(debug) {
         PRINT2B2("shortcut switch=", shortcut);
@@ -4103,7 +4105,7 @@ void model_parameters::calcOFL_Shortcut(int yr, int debug, ostream& cout)
             // 2. Create Tier 4 OFL Calculator
             //PRINT2B2("pPPM=", pPPM); 
             if(debug) PRINT2B1("Starting OFL_Calculations");
-            OFL_Calculator_Tier4* pOC4 = new OFL_Calculator_Tier4(pPPM, BmsyProx, shortcut);
+            OFL_Calculator_Tier4* pOC4 = new OFL_Calculator_Tier4(pPPM, BmsyProx, shortcut, HCRgamma); // added gamma
             if (debug) {
                  PRINT2B1("Past OFL_Calc");
                  cout<<"created pOC4."<<endl;
@@ -4248,6 +4250,7 @@ void model_parameters::calcOFL_OpMod(int debug, ostream& cout)
         if (debug) cout<<"declared pOC."<<endl;
     //9. Determine TIER LEVEL, define Tier_Calculators, calculate OFL
         int tier = ptrMOs->Tier;
+        double HCRgamma = ptrMOs->HCRgamma;
         int shortcut = ptrMOs->Shortcut;
         //int tier = 4;
         if (tier==3){
@@ -4333,7 +4336,7 @@ void model_parameters::calcOFL_OpMod(int debug, ostream& cout)
             dvariable BmsyProx = mean(sb_male);
             if(debug) PRINT2B2("BmsyProx_opmod=", BmsyProx);
             // 3. Create Tier 4 OFL Calculator
-            OFL_Calculator_Tier4* pOC4 = new OFL_Calculator_Tier4(pPPM, BmsyProx, shortcut);
+            OFL_Calculator_Tier4* pOC4 = new OFL_Calculator_Tier4(pPPM, BmsyProx, shortcut, HCRgamma); // added gamma OPMOD
             if (debug) {
                 cout<<"created pOC4."<<endl;
                 OFL_Calculator_Tier4::debug = 1;
@@ -8409,7 +8412,7 @@ int model_parameters::calcTAC(int hcr, double OFL)
     }
     PRINT2B1("-- CAPPING TAC at 50% ELMB--") // CAP TAC at 50% of ELMB
         //PRINT2B1("#GET ELMB")
-        double ELMB_cap = getELMB(ptrMOs->Shortcut, ptrSurvey);
+        double ELMB_cap = getELMB_State(ptrMOs->Shortcut, ptrSurvey);
         //PRINT2B2("#ELMB=", ELMB_cap) 
         double maxTAC = 0;
         double maxTAC30 = 0;
@@ -8707,7 +8710,7 @@ double model_parameters::repTAC(int hcr, double OFL)
         // CAP TAC at 50% of ELMB
         //PRINT2B1("-- CAPPING TAC at 50% ELMB--") // CAP TAC at 50% of ELMB         
         //PRINT2B1("#GET ELMB") 
-        double ELMB_cap = getELMB(ptrMOs->Shortcut, ptrSurvey);
+        double ELMB_cap = getELMB_State(ptrMOs->Shortcut, ptrSurvey);
         //PRINT2B2("#ELMB=", ELMB_cap) 
         double maxTAC = 0;
         double maxTAC30 = 0;
@@ -9004,7 +9007,7 @@ double model_parameters::repTAC_uncapped(int hcr, double OFL)
         // CAP TAC at 50% of ELMB
         //PRINT2B1("-- CAPPING TAC at 50% ELMB--") // CAP TAC at 50% of ELMB         
         //PRINT2B1("#GET ELMB") 
-        double ELMB_cap = getELMB(ptrMOs->Shortcut, ptrSurvey);
+        double ELMB_cap = getELMB_State(ptrMOs->Shortcut, ptrSurvey);
         //PRINT2B2("#ELMB=", ELMB_cap) 
         double maxTAC = 0;
         double maxTAC30 = 0;

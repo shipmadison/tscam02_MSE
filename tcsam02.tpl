@@ -4329,6 +4329,7 @@ FUNCTION void calcOFL(int yr, int debug, ostream& cout)
     //9. Determine TIER LEVEL, define Tier_Calculators, calculate OFL
     int tier = ptrMOs->Tier;
     int shortcut = ptrMOs->Shortcut;
+    double HCRgamma = ptrMOs -> HCRgamma; 
     PRINT2B2("Shortcut=", shortcut); 
     //int tier = 4;
         if (tier==3){
@@ -4378,7 +4379,7 @@ FUNCTION void calcOFL(int yr, int debug, ostream& cout)
             // 2. Create Tier 4 OFL Calculator
             //PRINT2B2("pPPM=", pPPM);
             
-            OFL_Calculator_Tier4* pOC4 = new OFL_Calculator_Tier4(pPPM, BmsyProx, shortcut); // add Shortcut variable
+            OFL_Calculator_Tier4* pOC4 = new OFL_Calculator_Tier4(pPPM, BmsyProx, shortcut, HCRgamma); // add Shortcut variable and gamma input
             
             if (debug) {
                 PRINT2B1("Past OFL_Calc");
@@ -4524,6 +4525,7 @@ FUNCTION void calcOFL_Shortcut(int yr, int debug, ostream& cout)
     }
 
      int tier = ptrMOs->Tier;
+     double HCRgamma = ptrMOs->HCRgamma;
      int shortcut = ptrMOs->Shortcut;
      if(debug) {
         PRINT2B2("shortcut switch=", shortcut);
@@ -4745,7 +4747,7 @@ FUNCTION void calcOFL_Shortcut(int yr, int debug, ostream& cout)
             // 2. Create Tier 4 OFL Calculator
             //PRINT2B2("pPPM=", pPPM); 
             if(debug) PRINT2B1("Starting OFL_Calculations");
-            OFL_Calculator_Tier4* pOC4 = new OFL_Calculator_Tier4(pPPM, BmsyProx, shortcut);
+            OFL_Calculator_Tier4* pOC4 = new OFL_Calculator_Tier4(pPPM, BmsyProx, shortcut, HCRgamma); // added gamma
                        
             
             if (debug) {
@@ -4928,6 +4930,7 @@ FUNCTION void calcOFL_OpMod(int debug, ostream& cout)
         
     //9. Determine TIER LEVEL, define Tier_Calculators, calculate OFL
         int tier = ptrMOs->Tier;
+        double HCRgamma = ptrMOs->HCRgamma;
         int shortcut = ptrMOs->Shortcut;
         //int tier = 4;
         if (tier==3){
@@ -5019,7 +5022,7 @@ FUNCTION void calcOFL_OpMod(int debug, ostream& cout)
             if(debug) PRINT2B2("BmsyProx_opmod=", BmsyProx);
               
             // 3. Create Tier 4 OFL Calculator
-            OFL_Calculator_Tier4* pOC4 = new OFL_Calculator_Tier4(pPPM, BmsyProx, shortcut);
+            OFL_Calculator_Tier4* pOC4 = new OFL_Calculator_Tier4(pPPM, BmsyProx, shortcut, HCRgamma); // added gamma OPMOD
             if (debug) {
                 cout<<"created pOC4."<<endl;
                 OFL_Calculator_Tier4::debug = 1;
@@ -9994,7 +9997,7 @@ FUNCTION double repTAC(int hcr, double OFL)  //int calcOption
         // CAP TAC at 50% of ELMB
         //PRINT2B1("-- CAPPING TAC at 50% ELMB--") // CAP TAC at 50% of ELMB         
         //PRINT2B1("#GET ELMB") 
-        double ELMB_cap = getELMB_state(ptrMOs->Shortcut, ptrSurvey);
+        double ELMB_cap = getELMB_State(ptrMOs->Shortcut, ptrSurvey);
        
         //PRINT2B2("#ELMB=", ELMB_cap) 
                 

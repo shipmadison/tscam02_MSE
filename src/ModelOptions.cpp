@@ -454,6 +454,10 @@ void ModelOptions::read(cifstream & is) {
     cout<<"#Tier level option (3 or 4)"<<endl;
     is>>Tier;
     cout<<Tier<<tb<<"#Tier Level scenario"<<endl;
+    // gamma scaler for Tier 4 Fed HCR
+    cout<<"#Gamma scaler for Tier 4 (assumed to be 1 unless specified)"<<endl;
+    is>>HCRgamma;
+    cout<<HCRgamma<<tb<<"#gamma scaler for Fmsy"<<endl;
     // Shortcut Methods
     cout<<"#Shortcut EM (0 or 1)"<<endl;
     is>>Shortcut;

@@ -444,6 +444,7 @@ class OFL_Calculator_Tier4{
         double M;     // Proxy for Fmsy; M = 0.23
         double alpha; //HCR intercept on (B/Bmsy) axis
         double beta;  //(B/Bmsy) limit below which the directed fishery is closed
+        double HCRgamma; // Gamma value used to scale Fmsy 
         dvariable Bmsy_proxy;  ///< proxy Bmsy: average MMB at mating from 1982–yr-1
         int shortcut_switch; //switch to turn on shortcut dynamics
 
@@ -461,8 +462,9 @@ class OFL_Calculator_Tier4{
          * @param pPrj - pointer to PopProjector object
          * @param Bmsy_prox - proxy for Bmsy (average historical MMB)
          * @param shortcut - switch for shortcut estimation method
+         * @param HCRgamma - gamma
          */
-        OFL_Calculator_Tier4(PopProjector* pPrj, dvariable Bmsy_prox, int shortcut);
+        OFL_Calculator_Tier4(PopProjector* pPrj, dvariable Bmsy_prox, int shortcut, double HCRgamma);
         
         /**
          * Calculate Fofl using the Harvest Control Rule (HCR).
@@ -470,11 +472,12 @@ class OFL_Calculator_Tier4{
          * @param currMMB - "current" MMB used to determine B/Bmsy
          * @param Bmsy - Bmsy
          * @param Fmsy - Fmsy
+         * @param HCRgamma - gamma
          * @param cout - output stream for debug info
          * 
          * @return Fofl derived from HCR
          */
-        dvariable calcHCR(dvariable currMMB, dvariable Bmsy, dvariable Fmsy, ostream& cout);
+        dvariable calcHCR(dvariable currMMB, dvariable Bmsy, dvariable Fmsy, double HCRgamma, ostream& cout);
         /**
          * Calculate Fofl using the Harvest Control Rule (HCR).
          * 
